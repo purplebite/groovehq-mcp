@@ -1,170 +1,104 @@
-# Groove MCP Server
+# groovehq-mcp
 
-A Model Context Protocol (MCP) server for Groove HQ, providing access to customer support ticketing, CRM, and knowledge base functionality through the Groove GraphQL API v2.
+Talk to your [Groove](https://groovehq.com) inbox from Claude or any other MCP client. Find that one ticket from three weeks ago, read the whole thread, reply, leave a note for a colleague, and close it, all without opening a single tab.
+
+## Why this fork exists
+
+We started this because Claude couldn't find our tickets. The npm package of [christiangenco/groove-mcp](https://github.com/christiangenco/groove-mcp) fails on nearly every lookup, and [ebenpaul/groovehq-mcp](https://github.com/ebenpaul/groovehq-mcp) has no keyword search.
+
+Both repos use Groove's REST API for conversations. This one runs on GraphQL only, and it's tested against a live account.
+
+## What you get
+
+**Tickets**
+
+- `listConversations`: search and filter by keyword, state, agent, team, contact, channel, or tag
+- `getConversation`: get one ticket
+- `createConversation`: start a new ticket by sending an email
+- `updateConversation`: change the state, assign someone, or add tags
+- `closeConversation`: the most satisfying one
+
+**Messages**
+
+- `listMessages`: every message and note on a ticket, oldest first
+- `sendMessage`: send an email reply
+- `createNote`: leave an internal note
+
+**Everything else**
+
+- `listContacts`, `getContact`, `createContact`, `updateContact`
+- `listAgents`, `getAgent`
+- `listChannels`, `getChannel`
+- `listTags`, `listTeams`
+- `searchKbArticles`
+
+Published knowledge base articles also show up as MCP resources.
+
+Tickets go by their number, just like in Groove. `12345`, `#12345`, and `cnv_12345` all work.
 
 ## Installation
 
-Get your GROOVE_API_TOKEN from https://YOUR_SUBDOMAIN.groovehq.com/settings/developer/api?tat-cursor=1&tat-entityType=accessToken&tat-pageSize=9999
+You'll need Node.js 18 or newer and a Groove API token. Grab your token here, with your own subdomain filled in:
 
-Then add the Groove MCP server to Claude Code:
+```
+https://YOUR_SUBDOMAIN.groovehq.com/settings/developer/api
+```
+
+Then add it to Claude Code:
 
 ```bash
-claude mcp add groove-mcp npx groove-mcp -s user --env GROOVE_API_TOKEN=your_groove_api_token_here
+claude mcp add groovehq-mcp -s user -e GROOVE_API_TOKEN=your_token_here -- npx -y groovehq-mcp
 ```
 
-You can also optionally set the `GROOVE_API_URL` as an environment variable (defaults to `https://api.groovehq.com/v2/graphql`).
+Restart Claude Code, then ask it something like *"show me the open tickets about invoices"*. That's it.
 
-If you'd like to run it locally, clone this repo and then run:
+Using a different MCP client? Have it run `npx -y groovehq-mcp` and set `GROOVE_API_TOKEN` in its environment.
 
-```
-claude mcp add groove-mcp node ~/path/to/groove-mcp/index.js -s user --env GROOVE_API_TOKEN=your_groove_api_token_here
-```
+> **Heads up:** the package is `groovehq-mcp`, with the `hq`. `groove-mcp` doesn't work.
 
-## Available Tools
+## Handle with care
 
-### Conversation Management
+This server can send real email to real customers. A few things keep that honest:
 
-- **listConversations** - List conversations with optional filters
+- **Recipients are always explicit.** `createConversation` and `sendMessage` require a `to` address, and nothing is sent to a default.
+- **Failed updates tell you what happened.** Groove has no all-or-nothing update, so `updateConversation` can succeed halfway. When it does, the error says which steps already went through.
 
-  - `status`: Filter by status (unread, opened, closed, snoozed)
-  - `assigneeId`: Filter by assigned agent ID
-  - `contactId`: Filter by contact ID
-  - `tagIds`: Filter by tag IDs
-  - `limit`: Maximum number of conversations to return (default: 20)
+Your MCP client will usually ask before a tool runs. For sending mail, it's a good idea to keep it that way.
 
-- **getConversation** - Get detailed information about a specific conversation
+## Good to know
 
-  - `id`: The conversation ID (required)
-
-- **createConversation** - Create a new conversation
-
-  - `contactId`: ID of the contact (required)
-  - `subject`: Subject of the conversation (required)
-  - `body`: Initial message body (required)
-  - `assigneeId`: ID of agent to assign to
-  - `tagIds`: Tag IDs to apply
-
-- **updateConversation** - Update a conversation
-
-  - `id`: The conversation ID (required)
-  - `status`: New status (opened, closed, snoozed)
-  - `assigneeId`: ID of agent to assign to
-  - `tagIds`: Tag IDs to apply
-  - `snoozedUntil`: ISO 8601 datetime to snooze until
-
-- **closeConversation** - Close a conversation
-  - `id`: The conversation ID to close (required)
-
-### Message Operations
-
-- **listMessages** - List messages in a conversation
-
-  - `conversationId`: The conversation ID to list messages for (required)
-  - `limit`: Maximum number of messages to return (default: 50)
-  - `after`: Cursor for pagination
-
-- **sendMessage** - Send a message in a conversation
-
-  - `conversationId`: The conversation ID to send message to (required)
-  - `body`: The message body content (required)
-  - `attachmentIds`: IDs of attachments to include
-
-- **createNote** - Create an internal note in a conversation
-  - `conversationId`: The conversation ID to add note to (required)
-  - `body`: The note content (required)
-
-### Contact Management
-
-- **listContacts** - List contacts with optional search
-
-  - `search`: Search string to filter contacts
-  - `limit`: Maximum number of contacts to return (default: 20)
-  - `after`: Cursor for pagination
-
-- **getContact** - Get detailed information about a specific contact
-
-  - `id`: The contact ID (required)
-
-- **createContact** - Create a new contact
-
-  - `email`: Contact email address (required)
-  - `firstName`: Contact first name
-  - `lastName`: Contact last name
-  - `company`: Contact company
-  - `title`: Contact job title
-  - `phone`: Contact phone number
-
-- **updateContact** - Update contact information
-  - `id`: The contact ID (required)
-  - `email`: Contact email address
-  - `firstName`: Contact first name
-  - `lastName`: Contact last name
-  - `company`: Contact company
-  - `title`: Contact job title
-  - `phone`: Contact phone number
-
-### Agent Operations
-
-- **listAgents** - List all agents in the organization
-
-- **getAgent** - Get detailed information about a specific agent
-
-  - `id`: The agent ID (required)
-
-- **getAvailableAgents** - List all available agents
-
-### Knowledge Base
-
-- **searchKbArticles** - Search knowledge base articles
-  - `query`: Search query (required)
-  - `limit`: Maximum number of articles to return (default: 20)
-
-## Resources
-
-The server exposes Knowledge Base articles as MCP resources. These can be browsed and read by MCP clients.
-
-- **Knowledge Base Articles** - Published KB articles are available as resources
-  - Each article includes metadata like category, views, and helpful votes
-  - Articles are returned in Markdown format when read
+- **Some of this API is undocumented.** Sending mail and adding notes are in the official docs. The read queries (`conversations` and `events`) aren't, but Groove's own web app uses them.
+- **Not tested with everything.** Our account only has email tickets and no knowledge base articles, so chat, widget, knowledge base search haven't been tried with real data.
+- **Some things aren't in here yet.** You can't send attachments or use cc and bcc, remove tags, unassign a ticket, or set a contact's company.
 
 ## Development
 
 ```bash
-# Watch mode for development
-npm run dev
+git clone https://github.com/purplebite/groovehq-mcp.git
+cd groovehq-mcp
+npm install
+npm run build
 
-# Run tests
-npm test
-
-# Lint code
-npm run lint
-
-# Type check
-npm run typecheck
+npm run dev        # rebuild on change
+npm run typecheck  # check types
 ```
 
-## Project Structure
+The code is small and easy to find your way around: tools live in `src/tools/`, and all the GraphQL lives in `src/utils/graphql-queries.ts`.
 
+## Testing
+
+`scripts/live-test.mjs` runs the real server against a real account and checks every read tool. It changes nothing and prints only counts and ticket numbers:
+
+```bash
+GROOVE_API_TOKEN=your_token_here npm run test:live
 ```
-├── src/
-│   ├── index.ts           # Main server entry point
-│   ├── groove-client.ts   # GraphQL client wrapper
-│   ├── tools/             # MCP tool implementations
-│   │   ├── conversations.ts
-│   │   ├── messages.ts
-│   │   ├── contacts.ts
-│   │   └── agents.ts
-│   ├── resources/         # MCP resource implementations
-│   │   └── kb-articles.ts
-│   ├── types/             # TypeScript type definitions
-│   │   └── groove.ts
-│   └── utils/             # Utility functions
-│       └── graphql-queries.ts
-├── tests/                 # Test files
-├── docs/                  # Documentation
-└── dist/                  # Compiled JavaScript files
+
+To test the tools that write, add `--write`. It asks first, then sends 2 real mails to `GROOVE_TEST_TO` and creates one ticket that it closes again:
+
+```bash
+GROOVE_API_TOKEN=your_token_here GROOVE_TEST_TO=you@example.com GROOVE_TEST_CHANNEL=ch_123 npm run test:live -- --write
 ```
 
 ## License
 
-MIT
+MIT. Original work by [Christian Genco](https://github.com/christiangenco). Thanks for the head start!

@@ -1,17 +1,18 @@
 {
-  "name": "groove-mcp",
-  "version": "0.1.0",
-  "description": "Model Context Protocol server for Groove HQ",
+  "name": "groovehq-mcp",
+  "version": "0.1.1",
+  "description": "Working MCP server for Groove HQ, updated for the current API and tested against a live account: search and read tickets, send email replies, add notes, and manage contacts.",
   "type": "module",
   "main": "dist/index.js",
   "bin": {
-    "groove-mcp": "dist/index.js"
+    "groovehq-mcp": "dist/index.js"
   },
   "scripts": {
     "build": "tsc",
     "start": "node dist/index.js",
     "dev": "tsc --watch",
     "test": "jest --passWithNoTests",
+    "test:live": "npm run build && node scripts/live-test.mjs",
     "lint": "eslint src/**/*.ts",
     "typecheck": "tsc --noEmit",
     "prepublishOnly": "npm run build && npm test"
@@ -23,13 +24,17 @@
     "help-desk"
   ],
   "author": "Christian Genco <christian@gen.co>",
+  "contributors": [
+    "Chris <chris@purplebite.nl>",
+    "Claude <noreply@anthropic.com>"
+  ],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/christiangenco/groove-mcp.git"
+    "url": "git+https://github.com/purplebite/groovehq-mcp.git"
   },
-  "homepage": "https://github.com/christiangenco/groove-mcp#readme",
+  "homepage": "https://github.com/purplebite/groovehq-mcp#readme",
   "bugs": {
-    "url": "https://github.com/christiangenco/groove-mcp/issues"
+    "url": "https://github.com/purplebite/groovehq-mcp/issues"
   },
   "engines": {
     "node": ">=18.0.0"

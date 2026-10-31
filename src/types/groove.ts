@@ -48,14 +48,15 @@ export interface Conversation {
 
 export interface Message {
   id: string;
-  conversationId: string;
   author: Contact | Agent;
   body: string;
   bodyPlainText?: string;
   createdAt: string;
   updatedAt: string;
-  type: 'message' | 'note';
-  attachments: Attachment[];
+  isNote: boolean;
+  attachments: {
+    nodes: Attachment[];
+  };
 }
 
 export interface Contact {
@@ -85,41 +86,41 @@ export interface Agent {
   lastName?: string;
   avatarUrl?: string;
   role: 'admin' | 'agent';
-  available: boolean;
+  state: string;
 }
 
 export interface Team {
   id: string;
   name: string;
+  description?: string;
 }
 
 export interface Tag {
   id: string;
   name: string;
   color?: string;
+  conversationCount?: number;
 }
 
 export interface Attachment {
   id: string;
-  filename: string;
-  contentType: string;
-  size: number;
-  url: string;
+  fileName: string;
+  fileType?: string;
+  fileSize?: number;
+  url?: string;
+  downloadUrl?: string;
 }
 
 export interface KnowledgeBaseArticle {
   id: string;
   title: string;
   slug: string;
+  description?: string;
   body: string;
-  bodyPlainText?: string;
-  categoryId: string;
-  category?: KnowledgeBaseCategory;
-  published: boolean;
+  state: string;
   featured: boolean;
-  views: number;
-  helpfulVotes: number;
-  unhelpfulVotes: number;
+  url?: string;
+  category?: KnowledgeBaseCategory;
   author?: Agent;
   createdAt: string;
   updatedAt: string;
@@ -128,15 +129,8 @@ export interface KnowledgeBaseArticle {
 
 export interface KnowledgeBaseCategory {
   id: string;
-  name: string;
-  description?: string;
+  title: string;
   slug: string;
-  parentId?: string;
-  parent?: KnowledgeBaseCategory;
-  position: number;
-  articleCount: number;
-  createdAt: string;
-  updatedAt: string;
 }
 
 export interface GraphQLError {

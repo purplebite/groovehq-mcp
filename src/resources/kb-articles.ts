@@ -1,6 +1,6 @@
 import { GrooveClient } from '../groove-client.js';
 import { queries } from '../utils/graphql-queries.js';
-import { KnowledgeBaseArticle, KnowledgeBaseCategory } from '../types/groove.js';
+import { KnowledgeBaseArticle } from '../types/groove.js';
 
 interface ListKbArticlesArgs {
   categoryId?: string;
@@ -20,61 +20,49 @@ export class KnowledgeBaseResources {
   constructor(private client: GrooveClient) {}
 
   async listArticles(args: ListKbArticlesArgs = {}): Promise<KnowledgeBaseArticle[]> {
-    const variables = {
-      categoryId: args.categoryId,
-      published: args.published,
-      featured: args.featured,
-      first: args.limit || 20,
-      after: args.after,
-    };
+    const filter: any = {};
+
+    if (args.categoryId) filter.category = args.categoryId;
+    if (args.featured !== undefined) filter.featured = args.featured;
+    if (args.published) filter.state = 'PUBLISHED';
 
     const response = await this.client.request<{
-      knowledgeBaseArticles: {
-        edges: Array<{ node: KnowledgeBaseArticle }>;
+      articles: {
+        nodes: KnowledgeBaseArticle[];
         pageInfo: {
           hasNextPage: boolean;
           endCursor: string;
         };
       };
-    }>(queries.listKbArticles, variables);
+    }>(queries.listKbArticles, { filter, first: args.limit || 20, after: args.after });
 
-    return response.knowledgeBaseArticles.edges.map(edge => edge.node);
+    return response.articles.nodes;
   }
 
   async getArticle(id: string): Promise<KnowledgeBaseArticle | null> {
     const response = await this.client.request<{
-      knowledgeBaseArticle: KnowledgeBaseArticle | null;
+      node: KnowledgeBaseArticle | null;
     }>(queries.getKbArticle, { id });
 
-    return response.knowledgeBaseArticle;
-  }
-
-  async listCategories(): Promise<KnowledgeBaseCategory[]> {
-    const response = await this.client.request<{
-      knowledgeBaseCategories: KnowledgeBaseCategory[];
-    }>(queries.listKbCategories);
-
-    return response.knowledgeBaseCategories;
+    return response.node;
   }
 
   async searchArticles(args: SearchKbArticlesArgs): Promise<KnowledgeBaseArticle[]> {
-    const variables = {
-      query: args.query,
-      first: args.limit || 20,
-      after: args.after,
-    };
-
     const response = await this.client.request<{
-      searchKnowledgeBaseArticles: {
-        edges: Array<{ node: KnowledgeBaseArticle }>;
+      articles: {
+        nodes: KnowledgeBaseArticle[];
         pageInfo: {
           hasNextPage: boolean;
           endCursor: string;
         };
       };
-    }>(queries.searchKbArticles, variables);
+    }>(queries.listKbArticles, {
+      filter: { keywords: args.query },
+      first: args.limit || 20,
+      after: args.after,
+    });
 
-    return response.searchKnowledgeBaseArticles.edges.map(edge => edge.node);
+    return response.articles.nodes;
   }
 
   // Helper method to build resource URIs
@@ -87,13 +75,11 @@ export class KnowledgeBaseResources {
     return {
       uri: this.buildResourceUri('article', article.id),
       name: article.title,
-      description: article.bodyPlainText?.substring(0, 200) + '...' || '',
+      description: article.description || '',
       mimeType: 'text/markdown',
       metadata: {
-        category: article.category?.name,
-        views: article.views,
-        helpful: article.helpfulVotes,
-        published: article.published,
+        category: article.category?.title,
+        state: article.state,
         featured: article.featured,
       },
     };

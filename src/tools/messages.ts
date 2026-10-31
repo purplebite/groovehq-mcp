@@ -1,17 +1,16 @@
 import { GrooveClient } from '../groove-client.js';
 import { queries, mutations } from '../utils/graphql-queries.js';
-import { Message } from '../types/groove.js';
+import { Conversation, Message } from '../types/groove.js';
 
 interface ListMessagesArgs {
   conversationId: string;
   limit?: number;
-  after?: string;
 }
 
 interface SendMessageArgs {
   conversationId: string;
+  to: string;
   body: string;
-  attachmentIds?: string[];
 }
 
 interface CreateNoteArgs {
@@ -23,51 +22,60 @@ export class MessageTools {
   constructor(private client: GrooveClient) {}
 
   async listMessages(args: ListMessagesArgs): Promise<Message[]> {
-    const variables = {
-      conversationId: args.conversationId,
-      first: args.limit || 50,
-      after: args.after,
-    };
+    const conversationId = await this.client.resolveConversationId(args.conversationId);
+    const messages: Message[] = [];
+    let after: string | undefined;
+    let hasNextPage = true;
 
-    const response = await this.client.request<{
-      messages: {
-        edges: Array<{ node: Message }>;
-        pageInfo: {
-          hasNextPage: boolean;
-          endCursor: string;
+    // Events list every message, unlike event groups, which show one per group
+    while (hasNextPage) {
+      const response = await this.client.request<{
+        events: {
+          nodes: Array<{ change: Partial<Message> | null }>;
+          pageInfo: {
+            hasNextPage: boolean;
+            endCursor: string;
+          };
         };
-      };
-    }>(queries.listMessages, variables);
+      }>(queries.listEvents, { filter: { conversationId }, first: 50, after });
 
-    return response.messages.edges.map(edge => edge.node);
+      for (const event of response.events.nodes) {
+        if (event.change?.id) messages.push(event.change as Message);
+      }
+
+      hasNextPage = response.events.pageInfo.hasNextPage;
+      after = response.events.pageInfo.endCursor;
+    }
+
+    messages.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+
+    return args.limit ? messages.slice(-args.limit) : messages;
   }
 
-  async sendMessage(args: SendMessageArgs): Promise<Message> {
-    const input = {
-      body: args.body,
-      attachmentIds: args.attachmentIds,
-    };
+  async sendMessage(args: SendMessageArgs): Promise<Conversation> {
+    const payload = await this.client.mutate<{ conversation: Conversation }>(
+      mutations.conversationReply,
+      'conversationReply',
+      {
+        conversationId: await this.client.resolveConversationId(args.conversationId),
+        to: args.to,
+        body: args.body,
+      }
+    );
 
-    const response = await this.client.request<{
-      sendMessage: {
-        message: Message;
-      };
-    }>(mutations.sendMessage, { conversationId: args.conversationId, input });
-
-    return response.sendMessage.message;
+    return payload.conversation;
   }
 
-  async createNote(args: CreateNoteArgs): Promise<Message> {
-    const input = {
-      body: args.body,
-    };
+  async createNote(args: CreateNoteArgs): Promise<Conversation> {
+    const payload = await this.client.mutate<{ conversation: Conversation }>(
+      mutations.conversationAddNote,
+      'conversationAddNote',
+      {
+        conversationId: await this.client.resolveConversationId(args.conversationId),
+        body: args.body,
+      }
+    );
 
-    const response = await this.client.request<{
-      createNote: {
-        note: Message;
-      };
-    }>(mutations.createNote, { conversationId: args.conversationId, input });
-
-    return response.createNote.note;
+    return payload.conversation;
   }
 }

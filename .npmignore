@@ -10,7 +10,6 @@ tsconfig.json
 coverage/
 .vscode/
 .idea/
-PLAN.md
 node_modules/
 .DS_Store
 *.tgz

@@ -1,5 +1,6 @@
 import { GraphQLClient } from 'graphql-request';
 import { GraphQLError } from './types/groove.js';
+import { queries } from './utils/graphql-queries.js';
 
 export class GrooveClient {
   private client: GraphQLClient;
@@ -23,10 +24,44 @@ export class GrooveClient {
     } catch (error: any) {
       if (error.response?.errors) {
         const graphqlError = error.response.errors[0] as GraphQLError;
+        // Groove reports an ID that never existed as deleted too
+        if (graphqlError.message.includes('object of type Conversation is deleted')) {
+          throw new Error('Ticket not found or deleted');
+        }
         throw new Error(`GraphQL Error: ${graphqlError.message}`);
       }
       throw error;
     }
+  }
+
+  // Tickets are referred to by number; the API addresses them by conversation ID
+  async resolveConversationId(ticket: string): Promise<string> {
+    const number = ticket.trim().replace(/^#/, '');
+    if (!/^\d+$/.test(number)) return ticket;
+
+    const response = await this.request<{
+      conversation: { id: string } | null;
+    }>(queries.getConversationId, { number: Number(number) });
+
+    if (!response.conversation) {
+      throw new Error(`Ticket not found: ${ticket}`);
+    }
+
+    return response.conversation.id;
+  }
+
+  // Mutations report validation failures in the payload instead of as GraphQL errors
+  async mutate<T = any>(mutation: string, field: string, input: any): Promise<T> {
+    const response = await this.request<
+      Record<string, T & { errors?: Array<{ message: string }> }>
+    >(mutation, { input });
+    const payload = response[field];
+
+    if (payload.errors?.length) {
+      throw new Error(`Groove Error: ${payload.errors[0].message}`);
+    }
+
+    return payload;
   }
 
   async validateConnection(): Promise<boolean> {

@@ -13,6 +13,8 @@ import { MessageTools } from './tools/messages.js';
 import { ContactTools } from './tools/contacts.js';
 import { AgentTools } from './tools/agents.js';
 import { ChannelTools } from './tools/channels.js';
+import { TagTools } from './tools/tags.js';
+import { TeamTools } from './tools/teams.js';
 import { KnowledgeBaseResources } from './resources/kb-articles.js';
 
 const apiToken = process.env.GROOVE_API_TOKEN;
@@ -24,17 +26,19 @@ if (!apiToken) {
 }
 
 const grooveClient = new GrooveClient(apiToken, apiUrl);
-const conversationTools = new ConversationTools(grooveClient, apiToken);
+const conversationTools = new ConversationTools(grooveClient);
 const messageTools = new MessageTools(grooveClient);
 const contactTools = new ContactTools(grooveClient);
 const agentTools = new AgentTools(grooveClient);
 const channelTools = new ChannelTools(grooveClient);
+const tagTools = new TagTools(grooveClient);
+const teamTools = new TeamTools(grooveClient);
 const kbResources = new KnowledgeBaseResources(grooveClient);
 
 const server = new Server(
   {
-    name: 'groove-mcp-server',
-    version: '0.1.0',
+    name: 'groovehq-mcp',
+    version: '0.1.1',
   },
   {
     capabilities: {
@@ -49,14 +53,14 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
     tools: [
       {
         name: 'listConversations',
-        description: 'List conversations with optional filters',
+        description: 'List conversations with optional filters. Returns one page; if pageInfo.hasNextPage is true, more results exist.',
         inputSchema: {
           type: 'object',
           properties: {
             state: {
               type: 'string',
               enum: ['unread', 'opened', 'closed', 'snoozed'],
-              description: 'Filter by conversation state',
+              description: 'Filter by conversation state (opened also includes unread)',
             },
             assignedAgentId: {
               type: 'string',
@@ -79,10 +83,18 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
               items: { type: 'string' },
               description: 'Filter by tag IDs',
             },
+            keywords: {
+              type: 'string',
+              description: 'Full-text search across conversations',
+            },
             limit: {
               type: 'number',
-              description: 'Maximum number of conversations to return',
+              description: 'Maximum number of conversations to return per page',
               default: 20,
+            },
+            after: {
+              type: 'string',
+              description: 'Cursor for the next page (pageInfo.endCursor from the previous result)',
             },
           },
         },
@@ -95,7 +107,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
           properties: {
             id: {
               type: 'string',
-              description: 'The conversation ID',
+              description: 'Ticket number (e.g. 12345) or conversation ID',
             },
           },
           required: ['id'],
@@ -103,13 +115,21 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       },
       {
         name: 'createConversation',
-        description: 'Create a new conversation',
+        description: 'Create a new conversation by sending an email',
         inputSchema: {
           type: 'object',
           properties: {
-            contactId: {
+            channelId: {
               type: 'string',
-              description: 'ID of the contact to start conversation with',
+              description: 'ID of the channel to send from',
+            },
+            to: {
+              type: 'string',
+              description: 'Email address of the recipient',
+            },
+            toName: {
+              type: 'string',
+              description: 'Name of the recipient (defaults to the email address)',
             },
             subject: {
               type: 'string',
@@ -133,7 +153,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
               description: 'Tag IDs to apply to the conversation',
             },
           },
-          required: ['contactId', 'subject', 'body'],
+          required: ['channelId', 'to', 'subject', 'body'],
         },
       },
       {
@@ -144,7 +164,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
           properties: {
             id: {
               type: 'string',
-              description: 'The conversation ID',
+              description: 'Ticket number (e.g. 12345) or conversation ID',
             },
             state: {
               type: 'string',
@@ -162,7 +182,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
             tagIds: {
               type: 'array',
               items: { type: 'string' },
-              description: 'Tag IDs to apply to the conversation',
+              description: 'Tag IDs to add to the conversation (existing tags are kept)',
             },
             snoozedUntil: {
               type: 'string',
@@ -180,7 +200,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
           properties: {
             id: {
               type: 'string',
-              description: 'The conversation ID to close',
+              description: 'Ticket number (e.g. 12345) or conversation ID',
             },
           },
           required: ['id'],
@@ -188,22 +208,17 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       },
       {
         name: 'listMessages',
-        description: 'List messages in a conversation',
+        description: 'List messages and notes in a conversation, oldest first',
         inputSchema: {
           type: 'object',
           properties: {
             conversationId: {
               type: 'string',
-              description: 'The conversation ID to list messages for',
+              description: 'Ticket number (e.g. 12345) or conversation ID',
             },
             limit: {
               type: 'number',
-              description: 'Maximum number of messages to return',
-              default: 50,
-            },
-            after: {
-              type: 'string',
-              description: 'Cursor for pagination',
+              description: 'Return only this many of the most recent messages (default: all)',
             },
           },
           required: ['conversationId'],
@@ -211,25 +226,24 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       },
       {
         name: 'sendMessage',
-        description: 'Send a message in a conversation',
+        description: 'Send an email reply in a conversation',
         inputSchema: {
           type: 'object',
           properties: {
             conversationId: {
               type: 'string',
-              description: 'The conversation ID to send message to',
+              description: 'Ticket number (e.g. 12345) or conversation ID',
+            },
+            to: {
+              type: 'string',
+              description: 'Email address of the recipient',
             },
             body: {
               type: 'string',
               description: 'The message body content',
             },
-            attachmentIds: {
-              type: 'array',
-              items: { type: 'string' },
-              description: 'IDs of attachments to include',
-            },
           },
-          required: ['conversationId', 'body'],
+          required: ['conversationId', 'to', 'body'],
         },
       },
       {
@@ -240,7 +254,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
           properties: {
             conversationId: {
               type: 'string',
-              description: 'The conversation ID to add note to',
+              description: 'Ticket number (e.g. 12345) or conversation ID',
             },
             body: {
               type: 'string',
@@ -252,7 +266,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       },
       {
         name: 'listContacts',
-        description: 'List contacts with optional search',
+        description: 'List contacts with optional search. Returns one page; if pageInfo.hasNextPage is true, more results exist.',
         inputSchema: {
           type: 'object',
           properties: {
@@ -262,7 +276,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
             },
             limit: {
               type: 'number',
-              description: 'Maximum number of contacts to return',
+              description: 'Maximum number of contacts to return per page',
               default: 20,
             },
             after: {
@@ -304,10 +318,6 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
               type: 'string',
               description: 'Contact last name',
             },
-            company: {
-              type: 'string',
-              description: 'Contact company',
-            },
             title: {
               type: 'string',
               description: 'Contact job title',
@@ -341,10 +351,6 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
             lastName: {
               type: 'string',
               description: 'Contact last name',
-            },
-            company: {
-              type: 'string',
-              description: 'Contact company',
             },
             title: {
               type: 'string',
@@ -381,14 +387,6 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
         },
       },
       {
-        name: 'getAvailableAgents',
-        description: 'List all available agents',
-        inputSchema: {
-          type: 'object',
-          properties: {},
-        },
-      },
-      {
         name: 'searchKbArticles',
         description: 'Search knowledge base articles',
         inputSchema: {
@@ -405,6 +403,27 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
             },
           },
           required: ['query'],
+        },
+      },
+      {
+        name: 'listTags',
+        description: 'List all tags, for filtering or tagging tickets',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            search: {
+              type: 'string',
+              description: 'Search string to filter tags by name',
+            },
+          },
+        },
+      },
+      {
+        name: 'listTeams',
+        description: 'List all teams, for filtering or assigning tickets',
+        inputSchema: {
+          type: 'object',
+          properties: {},
         },
       },
       {
@@ -475,8 +494,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       }
 
       case 'createConversation': {
-        if (!args || !args.contactId || !args.subject || !args.body) {
-          throw new Error('contactId, subject, and body are required');
+        if (!args || !args.channelId || !args.to || !args.subject || !args.body) {
+          throw new Error('channelId, to, subject, and body are required');
         }
         const conversation = await conversationTools.createConversation(args as any);
         return {
@@ -523,10 +542,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         if (!args || typeof args.conversationId !== 'string') {
           throw new Error('Conversation ID is required');
         }
-        const messages = await conversationTools.listMessages(
-          args.conversationId, 
-          typeof args.limit === 'number' ? args.limit : undefined
-        );
+        const messages = await messageTools.listMessages(args as any);
         return {
           content: [
             {
@@ -538,8 +554,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       }
 
       case 'sendMessage': {
-        if (!args || !args.conversationId || !args.body) {
-          throw new Error('conversationId and body are required');
+        if (!args || !args.conversationId || !args.to || !args.body) {
+          throw new Error('conversationId, to, and body are required');
         }
         const message = await messageTools.sendMessage(args as any);
         return {
@@ -657,18 +673,6 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         };
       }
 
-      case 'getAvailableAgents': {
-        const agents = await agentTools.getAvailableAgents();
-        return {
-          content: [
-            {
-              type: 'text',
-              text: JSON.stringify(agents, null, 2),
-            },
-          ],
-        };
-      }
-
       case 'searchKbArticles': {
         if (!args || !args.query) {
           throw new Error('Search query is required');
@@ -679,6 +683,30 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             {
               type: 'text',
               text: JSON.stringify(articles, null, 2),
+            },
+          ],
+        };
+      }
+
+      case 'listTags': {
+        const tags = await tagTools.listTags(args || {});
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify(tags, null, 2),
+            },
+          ],
+        };
+      }
+
+      case 'listTeams': {
+        const teams = await teamTools.listTeams();
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify(teams, null, 2),
             },
           ],
         };
@@ -771,11 +799,8 @@ server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
           mimeType: 'text/markdown',
           text: `# ${article.title}\n\n${article.body}`,
           metadata: {
-            category: article.category?.name,
-            views: article.views,
-            helpful: article.helpfulVotes,
-            unhelpful: article.unhelpfulVotes,
-            published: article.published,
+            category: article.category?.title,
+            state: article.state,
             featured: article.featured,
             createdAt: article.createdAt,
             updatedAt: article.updatedAt,

@@ -6,11 +6,27 @@ export class AgentTools {
   constructor(private client: GrooveClient) {}
 
   async listAgents(): Promise<Agent[]> {
-    const response = await this.client.request<{
-      agents: Agent[];
-    }>(queries.listAgents);
+    const agents: Agent[] = [];
+    let after: string | undefined;
+    let hasNextPage = true;
 
-    return response.agents;
+    while (hasNextPage) {
+      const response = await this.client.request<{
+        agents: {
+          nodes: Agent[];
+          pageInfo: {
+            hasNextPage: boolean;
+            endCursor: string;
+          };
+        };
+      }>(queries.listAgents, { first: 100, after });
+
+      agents.push(...response.agents.nodes);
+      hasNextPage = response.agents.pageInfo.hasNextPage;
+      after = response.agents.pageInfo.endCursor;
+    }
+
+    return agents;
   }
 
   async getAgent(id: string): Promise<Agent | null> {
@@ -18,10 +34,5 @@ export class AgentTools {
     // and find the one with the matching ID
     const agents = await this.listAgents();
     return agents.find(agent => agent.id === id) || null;
-  }
-
-  async getAvailableAgents(): Promise<Agent[]> {
-    const agents = await this.listAgents();
-    return agents.filter(agent => agent.available);
   }
 }

@@ -62,7 +62,7 @@ export const MESSAGE_FIELDS = `
   bodyPlainText
   createdAt
   updatedAt
-  type
+  isNote
   author {
     ... on Contact {
       id
@@ -81,11 +81,14 @@ export const MESSAGE_FIELDS = `
     }
   }
   attachments {
-    id
-    filename
-    contentType
-    size
-    url
+    nodes {
+      id
+      fileName
+      fileType
+      fileSize
+      url
+      downloadUrl
+    }
   }
 `;
 
@@ -116,26 +119,23 @@ const AGENT_FIELDS = `
   lastName
   avatarUrl
   role
-  available
+  state
 `;
 
 const KB_ARTICLE_FIELDS = `
   id
   title
   slug
+  description
   body
-  bodyPlainText
-  categoryId
+  state
+  featured
+  url
   category {
     id
-    name
+    title
     slug
   }
-  published
-  featured
-  views
-  helpfulVotes
-  unhelpfulVotes
   author {
     id
     email
@@ -146,36 +146,20 @@ const KB_ARTICLE_FIELDS = `
   publishedAt
 `;
 
-const KB_CATEGORY_FIELDS = `
-  id
-  name
-  description
-  slug
-  parentId
-  position
-  articleCount
-  createdAt
-  updatedAt
-`;
-
 export const queries = {
   listConversations: `
     query ListConversations(
       $first: Int
       $after: String
       $filter: ConversationFilter
-      $orderBy: ConversationOrder
     ) {
       conversations(
         first: $first
         after: $after
         filter: $filter
-        orderBy: $orderBy
       ) {
-        edges {
-          node {
-            ${CONVERSATION_FIELDS}
-          }
+        nodes {
+          ${CONVERSATION_FIELDS}
         }
         pageInfo {
           hasNextPage
@@ -187,18 +171,30 @@ export const queries = {
 
   getConversation: `
     query GetConversation($id: ID!) {
-      conversation(id: $id) {
-        ${CONVERSATION_FIELDS}
+      node(id: $id) {
+        ... on Conversation {
+          ${CONVERSATION_FIELDS}
+        }
       }
     }
   `,
 
-  listMessages: `
-    query ListMessages($conversationId: ID!, $first: Int, $after: String) {
-      messages(conversationId: $conversationId, first: $first, after: $after) {
-        edges {
-          node {
-            ${MESSAGE_FIELDS}
+  getConversationId: `
+    query GetConversationId($number: Int!) {
+      conversation(number: $number) {
+        id
+      }
+    }
+  `,
+
+  listEvents: `
+    query ListEvents($filter: EventsFilterInput!, $first: Int, $after: String) {
+      events(filter: $filter, first: $first, after: $after) {
+        nodes {
+          change {
+            ... on Message {
+              ${MESSAGE_FIELDS}
+            }
           }
         }
         pageInfo {
@@ -210,12 +206,10 @@ export const queries = {
   `,
 
   listContacts: `
-    query ListContacts($first: Int, $after: String, $search: String) {
-      contacts(first: $first, after: $after, search: $search) {
-        edges {
-          node {
-            ${CONTACT_FIELDS}
-          }
+    query ListContacts($first: Int, $after: String, $filter: ContactFilter) {
+      contacts(first: $first, after: $after, filter: $filter) {
+        nodes {
+          ${CONTACT_FIELDS}
         }
         pageInfo {
           hasNextPage
@@ -227,27 +221,66 @@ export const queries = {
 
   getContact: `
     query GetContact($id: ID!) {
-      contact(id: $id) {
-        ${CONTACT_FIELDS}
+      node(id: $id) {
+        ... on Contact {
+          ${CONTACT_FIELDS}
+        }
       }
     }
   `,
 
   listAgents: `
-    query ListAgents {
-      agents {
-        ${AGENT_FIELDS}
+    query ListAgents($first: Int, $after: String) {
+      agents(first: $first, after: $after) {
+        nodes {
+          ${AGENT_FIELDS}
+        }
+        pageInfo {
+          hasNextPage
+          endCursor
+        }
+      }
+    }
+  `,
+
+  listTags: `
+    query ListTags($first: Int, $after: String, $filter: TagFilter) {
+      tags(first: $first, after: $after, filter: $filter) {
+        nodes {
+          id
+          name
+          color
+          conversationCount
+        }
+        pageInfo {
+          hasNextPage
+          endCursor
+        }
+      }
+    }
+  `,
+
+  listTeams: `
+    query ListTeams($first: Int, $after: String) {
+      teams(first: $first, after: $after) {
+        nodes {
+          id
+          name
+          description
+        }
+        pageInfo {
+          hasNextPage
+          endCursor
+        }
       }
     }
   `,
 
   listKbArticles: `
-    query ListKbArticles($categoryId: ID, $published: Boolean, $featured: Boolean, $first: Int, $after: String) {
-      knowledgeBaseArticles(categoryId: $categoryId, published: $published, featured: $featured, first: $first, after: $after) {
-        edges {
-          node {
-            ${KB_ARTICLE_FIELDS}
-          }
+    query ListKbArticles($filter: ArticleFilter, $first: Int, $after: String) {
+      articles(filter: $filter, first: $first, after: $after) {
+        nodes {
+          ${KB_ARTICLE_FIELDS}
         }
         pageInfo {
           hasNextPage
@@ -259,31 +292,9 @@ export const queries = {
 
   getKbArticle: `
     query GetKbArticle($id: ID!) {
-      knowledgeBaseArticle(id: $id) {
-        ${KB_ARTICLE_FIELDS}
-      }
-    }
-  `,
-
-  listKbCategories: `
-    query ListKbCategories {
-      knowledgeBaseCategories {
-        ${KB_CATEGORY_FIELDS}
-      }
-    }
-  `,
-
-  searchKbArticles: `
-    query SearchKbArticles($query: String!, $first: Int, $after: String) {
-      searchKnowledgeBaseArticles(query: $query, first: $first, after: $after) {
-        edges {
-          node {
-            ${KB_ARTICLE_FIELDS}
-          }
-        }
-        pageInfo {
-          hasNextPage
-          endCursor
+      node(id: $id) {
+        ... on Article {
+          ${KB_ARTICLE_FIELDS}
         }
       }
     }
@@ -291,47 +302,138 @@ export const queries = {
 };
 
 export const mutations = {
-  // Note: Conversation mutations are not currently available in the Groove GraphQL API
-  // The Inbox API is still being built by Groove
-  
-  // createConversation: Not available
-  // updateConversation: Not available
-
-  sendMessage: `
-    mutation SendMessage($conversationId: ID!, $input: SendMessageInput!) {
-      sendMessage(conversationId: $conversationId, input: $input) {
-        message {
-          ${MESSAGE_FIELDS}
+  conversationCreateEmail: `
+    mutation ConversationCreateEmail($input: ConversationCreateEmailInput!) {
+      conversationCreateEmail(input: $input) {
+        conversation {
+          ${CONVERSATION_FIELDS}
+        }
+        errors {
+          message
+          path
         }
       }
     }
   `,
 
-  createNote: `
-    mutation CreateNote($conversationId: ID!, $input: CreateNoteInput!) {
-      createNote(conversationId: $conversationId, input: $input) {
-        note {
-          ${MESSAGE_FIELDS}
+  conversationClose: `
+    mutation ConversationClose($input: ConversationCloseInput!) {
+      conversationClose(input: $input) {
+        conversation {
+          ${CONVERSATION_FIELDS}
+        }
+        errors {
+          message
+          path
         }
       }
     }
   `,
 
-  createContact: `
-    mutation CreateContact($input: CreateContactInput!) {
-      createContact(input: $input) {
+  conversationReply: `
+    mutation ConversationReply($input: ConversationReplyInput!) {
+      conversationReply(input: $input) {
+        conversation {
+          ${CONVERSATION_FIELDS}
+        }
+        errors {
+          message
+          path
+        }
+      }
+    }
+  `,
+
+  conversationAddNote: `
+    mutation ConversationAddNote($input: conversationAddNoteInput!) {
+      conversationAddNote(input: $input) {
+        conversation {
+          ${CONVERSATION_FIELDS}
+        }
+        errors {
+          message
+          path
+        }
+      }
+    }
+  `,
+
+  conversationOpen: `
+    mutation ConversationOpen($input: ConversationOpenInput!) {
+      conversationOpen(input: $input) {
+        conversation {
+          ${CONVERSATION_FIELDS}
+        }
+        errors {
+          message
+          path
+        }
+      }
+    }
+  `,
+
+  conversationSnooze: `
+    mutation ConversationSnooze($input: ConversationSnoozeInput!) {
+      conversationSnooze(input: $input) {
+        conversation {
+          ${CONVERSATION_FIELDS}
+        }
+        errors {
+          message
+          path
+        }
+      }
+    }
+  `,
+
+  conversationAssign: `
+    mutation ConversationAssign($input: ConversationAssignInput!) {
+      conversationAssign(input: $input) {
+        conversation {
+          ${CONVERSATION_FIELDS}
+        }
+        errors {
+          message
+          path
+        }
+      }
+    }
+  `,
+
+  conversationTag: `
+    mutation ConversationTag($input: ConversationTagInput!) {
+      conversationTag(input: $input) {
+        conversation {
+          ${CONVERSATION_FIELDS}
+        }
+        errors {
+          message
+          path
+        }
+      }
+    }
+  `,
+
+  contactCreate: `
+    mutation ContactCreate($input: ContactCreateInput!) {
+      contactCreate(input: $input) {
         contact {
           ${CONTACT_FIELDS}
         }
+        errors {
+          message
+          path
+        }
       }
     }
   `,
 
-  updateContact: `
-    mutation UpdateContact($id: ID!, $input: UpdateContactInput!) {
-      updateContact(id: $id, input: $input) {
-        contact {
-          ${CONTACT_FIELDS}
+  customFieldValuesUpdate: `
+    mutation CustomFieldValuesUpdate($input: CustomFieldValuesUpdateInput!) {
+      customFieldValuesUpdate(input: $input) {
+        errors {
+          message
+          path
         }
       }
     }

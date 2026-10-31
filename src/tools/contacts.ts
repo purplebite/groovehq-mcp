@@ -8,11 +8,18 @@ interface ListContactsArgs {
   after?: string;
 }
 
+interface ListContactsResult {
+  contacts: Contact[];
+  pageInfo: {
+    hasNextPage: boolean;
+    endCursor: string | null;
+  };
+}
+
 interface CreateContactArgs {
   email: string;
   firstName?: string;
   lastName?: string;
-  company?: string;
   title?: string;
   phone?: string;
 }
@@ -22,77 +29,83 @@ interface UpdateContactArgs {
   email?: string;
   firstName?: string;
   lastName?: string;
-  company?: string;
   title?: string;
   phone?: string;
+}
+
+const CUSTOM_FIELD_KEYS = {
+  email: 'contact_email',
+  firstName: 'contact_first_name',
+  lastName: 'contact_last_name',
+  title: 'contact_job_title',
+  phone: 'contact_phone_number',
+} as const;
+
+// Groove stores contact details as custom fields rather than contact attributes
+function toCustomFields(args: Partial<Record<keyof typeof CUSTOM_FIELD_KEYS, string>>) {
+  const fields = [];
+
+  for (const [name, key] of Object.entries(CUSTOM_FIELD_KEYS)) {
+    const value = args[name as keyof typeof CUSTOM_FIELD_KEYS];
+    if (value !== undefined) fields.push({ customFieldIdOrKey: key, value });
+  }
+
+  return fields;
 }
 
 export class ContactTools {
   constructor(private client: GrooveClient) {}
 
-  async listContacts(args: ListContactsArgs = {}): Promise<Contact[]> {
+  async listContacts(args: ListContactsArgs = {}): Promise<ListContactsResult> {
     const variables = {
       first: args.limit || 20,
       after: args.after,
-      search: args.search,
+      filter: args.search ? { search: args.search } : undefined,
     };
 
     const response = await this.client.request<{
       contacts: {
-        edges: Array<{ node: Contact }>;
+        nodes: Contact[];
         pageInfo: {
           hasNextPage: boolean;
-          endCursor: string;
+          endCursor: string | null;
         };
       };
     }>(queries.listContacts, variables);
 
-    return response.contacts.edges.map(edge => edge.node);
+    return { contacts: response.contacts.nodes, pageInfo: response.contacts.pageInfo };
   }
 
   async getContact(id: string): Promise<Contact | null> {
     const response = await this.client.request<{
-      contact: Contact | null;
+      node: Contact | null;
     }>(queries.getContact, { id });
 
-    return response.contact;
+    return response.node;
   }
 
   async createContact(args: CreateContactArgs): Promise<Contact> {
-    const input = {
-      email: args.email,
-      firstName: args.firstName,
-      lastName: args.lastName,
-      company: args.company,
-      title: args.title,
-      phone: args.phone,
-    };
+    const payload = await this.client.mutate<{ contact: Contact }>(
+      mutations.contactCreate,
+      'contactCreate',
+      { contactType: 'contact', customFields: toCustomFields(args), skipCompanyCreation: true }
+    );
 
-    const response = await this.client.request<{
-      createContact: {
-        contact: Contact;
-      };
-    }>(mutations.createContact, { input });
-
-    return response.createContact.contact;
+    return payload.contact;
   }
 
-  async updateContact(args: UpdateContactArgs): Promise<Contact> {
-    const input: any = {};
-    
-    if (args.email !== undefined) input.email = args.email;
-    if (args.firstName !== undefined) input.firstName = args.firstName;
-    if (args.lastName !== undefined) input.lastName = args.lastName;
-    if (args.company !== undefined) input.company = args.company;
-    if (args.title !== undefined) input.title = args.title;
-    if (args.phone !== undefined) input.phone = args.phone;
+  async updateContact(args: UpdateContactArgs): Promise<Contact | null> {
+    const customFieldList = toCustomFields(args);
 
-    const response = await this.client.request<{
-      updateContact: {
-        contact: Contact;
-      };
-    }>(mutations.updateContact, { id: args.id, input });
+    if (customFieldList.length === 0) {
+      throw new Error('Provide at least one of email, firstName, lastName, title or phone');
+    }
 
-    return response.updateContact.contact;
+    await this.client.mutate(mutations.customFieldValuesUpdate, 'customFieldValuesUpdate', {
+      subjectId: args.id,
+      customFieldList,
+    });
+
+    return this.getContact(args.id);
   }
 }

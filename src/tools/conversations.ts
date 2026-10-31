@@ -1,5 +1,4 @@
 import { GrooveClient } from '../groove-client.js';
-import { GrooveRestClient } from '../rest-client.js';
 import { queries, mutations } from '../utils/graphql-queries.js';
 import { Conversation } from '../types/groove.js';
 
@@ -10,7 +9,17 @@ interface ListConversationsArgs {
   contactId?: string;
   channelId?: string;
   tagIds?: string[];
+  keywords?: string;
   limit?: number;
+  after?: string;
+}
+
+interface ListConversationsResult {
+  conversations: Conversation[];
+  pageInfo: {
+    hasNextPage: boolean;
+    endCursor: string | null;
+  };
 }
 
 interface UpdateConversationArgs {
@@ -23,7 +32,9 @@ interface UpdateConversationArgs {
 }
 
 interface CreateConversationArgs {
-  contactId: string;
+  channelId: string;
+  to: string;
+  toName?: string;
   subject: string;
   body: string;
   assignedAgentId?: string;
@@ -32,141 +43,121 @@ interface CreateConversationArgs {
 }
 
 export class ConversationTools {
-  private restClient: GrooveRestClient;
+  constructor(private client: GrooveClient) {}
 
-  constructor(private client: GrooveClient, apiToken: string) {
-    this.restClient = new GrooveRestClient(apiToken);
-  }
+  async listConversations(args: ListConversationsArgs): Promise<ListConversationsResult> {
+    const filter: any = {};
 
-  private convertTicketToConversation(ticket: any): Conversation {
-    // Convert REST API ticket format to GraphQL-like Conversation format
+    if (args.state) filter.state = args.state.toUpperCase();
+    if (args.assignedAgentId) filter.assigned = { agent: args.assignedAgentId };
+    if (args.assignedTeamId) filter.assigned = { ...filter.assigned, team: args.assignedTeamId };
+    if (args.contactId) filter.contactId = args.contactId;
+    if (args.channelId) filter.channelId = args.channelId;
+    if (args.tagIds) filter.tags = args.tagIds;
+    if (args.keywords) filter.keywords = args.keywords;
+
+    const response = await this.client.request<{
+      conversations: {
+        nodes: Conversation[];
+        pageInfo: {
+          hasNextPage: boolean;
+          endCursor: string | null;
+        };
+      };
+    }>(queries.listConversations, { first: args.limit || 20, after: args.after, filter });
+
     return {
-      id: `cnv_${ticket.id}`,
-      number: ticket.number,
-      state: ticket.state.toUpperCase() as any,
-      subject: ticket.title,
-      createdAt: ticket.created_at,
-      updatedAt: ticket.updated_at,
-      stateUpdatedAt: ticket.state_changed_at,
-      assigned: undefined, // Would need additional mapping for assigned agent/team
-      contact: {
-        id: `co_${ticket.links?.customer?.id || 'unknown'}`,
-        email: ticket.links?.customer?.href?.split('/').pop() || undefined,
-        name: ticket.links?.customer?.href?.split('/').pop() || undefined,
-        firstName: ticket.links?.customer?.href?.split('/').pop() || undefined,
-        lastName: undefined,
-        createdAt: ticket.created_at,
-        updatedAt: ticket.updated_at,
-      },
-      counts: {
-        messages: ticket.message_count || 0,
-        notes: 0,
-        interactions: ticket.interaction_count || 0,
-        attachments: ticket.attachment_count || 0,
-        stateChanges: 0,
-      },
-      tags: {
-        nodes: (ticket.tags || []).map((tag: string) => ({ id: tag, name: tag })),
-      },
-      snoozed: ticket.snoozed_until ? {
-        by: { id: ticket.snoozed_by_id || '', email: '' },
-        until: ticket.snoozed_until,
-      } : undefined,
-      starred: false,
-      channel: {
-        __typename: 'Channel',
-        id: `ch_${ticket.mailbox_id}`,
-        name: ticket.mailbox,
-        type: 'FORWARDING' as const,
-        conversationCount: 0,
-        color: 'rgba(220, 86, 56, 1)',
-        state: 'ACTIVE' as const,
-        createdAt: ticket.created_at,
-        updatedAt: ticket.updated_at,
-      },
+      conversations: response.conversations.nodes,
+      pageInfo: response.conversations.pageInfo,
     };
   }
 
-  async listConversations(args: ListConversationsArgs): Promise<Conversation[]> {
-    // Use REST API since GraphQL doesn't support conversations yet
-    const tickets = await this.restClient.listTickets(args.limit);
-    
-    // Apply filters on the client side since REST API has limited filtering
-    let filteredTickets = tickets;
-    
-    if (args.state) {
-      filteredTickets = filteredTickets.filter(ticket => 
-        ticket.state.toLowerCase() === args.state!.toLowerCase()
-      );
-    }
-    
-    if (args.channelId) {
-      const channelNumber = args.channelId.replace('ch_', '');
-      filteredTickets = filteredTickets.filter(ticket => 
-        ticket.mailbox_id === channelNumber
-      );
-    }
-    
-    // Convert REST tickets to GraphQL-like Conversation objects
-    return filteredTickets.map(ticket => this.convertTicketToConversation(ticket));
-  }
-
   async getConversation(id: string): Promise<Conversation | null> {
-    try {
-      // Convert GraphQL ID format (cnv_12345) to REST format (12345)
-      const ticketId = id.replace('cnv_', '');
-      const ticket = await this.restClient.getTicket(ticketId);
-      
-      return this.convertTicketToConversation(ticket);
-    } catch (error) {
-      // If ticket not found, return null
-      if (error instanceof Error && error.message.includes('404')) {
-        return null;
-      }
-      throw error;
-    }
+    const response = await this.client.request<{
+      node: Conversation | null;
+    }>(queries.getConversation, { id: await this.client.resolveConversationId(id) });
+
+    return response.node;
   }
 
   async createConversation(args: CreateConversationArgs): Promise<Conversation> {
-    throw new Error(
-      'Conversation creation is not currently supported by the Groove REST API v1. ' +
-      'The GraphQL API with conversation creation is still being built by Groove. ' +
-      'Please check the Groove developer documentation for updates.'
+    const payload = await this.client.mutate<{ conversation: Conversation }>(
+      mutations.conversationCreateEmail,
+      'conversationCreateEmail',
+      {
+        channelId: args.channelId,
+        message: {
+          subject: args.subject,
+          body: args.body,
+          to: [{ email: args.to, name: args.toName || args.to }],
+        },
+        assigned: { agentId: args.assignedAgentId, teamId: args.assignedTeamId },
+        tagIds: args.tagIds,
+      }
     );
+
+    return payload.conversation;
   }
 
   async updateConversation(args: UpdateConversationArgs): Promise<Conversation> {
-    // Use REST API for conversation updates since GraphQL doesn't support it yet
-    if (args.state) {
-      // Convert GraphQL ID format (cnv_12345) to REST format (12345)
-      const ticketId = args.id.replace('cnv_', '');
-      await this.restClient.updateTicketState(ticketId, args.state);
-      
-      // Return the updated conversation by fetching it directly via REST
-      const updatedTicket = await this.restClient.getTicket(ticketId);
-      return this.convertTicketToConversation(updatedTicket);
+    const conversationId = await this.client.resolveConversationId(args.id);
+    const applied: string[] = [];
+    let conversation: Conversation | undefined;
+
+    // Groove has no atomic update, so a failure reports the steps that already went through
+    const apply = async (step: string, mutation: string, field: string, input: any) => {
+      try {
+        const payload = await this.client.mutate<{ conversation: Conversation }>(
+          mutation,
+          field,
+          { conversationId, ...input }
+        );
+        conversation = payload.conversation;
+        applied.push(step);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        throw new Error(
+          `Failed to update ${step}: ${message}` +
+            (applied.length ? ` (already applied: ${applied.join(', ')})` : ' (nothing was changed)')
+        );
+      }
+    };
+
+    if (args.state === 'opened') {
+      await apply('state', mutations.conversationOpen, 'conversationOpen', {});
+    } else if (args.state === 'closed') {
+      await apply('state', mutations.conversationClose, 'conversationClose', {});
+    } else if (args.state === 'snoozed') {
+      await apply('state', mutations.conversationSnooze, 'conversationSnooze', {
+        until: args.snoozedUntil,
+      });
     }
-    
-    throw new Error(
-      'Only state updates are currently supported via REST API fallback. ' +
-      'Other conversation updates require GraphQL API support which is not yet available.'
-    );
+
+    if (args.assignedAgentId || args.assignedTeamId) {
+      await apply('assignee', mutations.conversationAssign, 'conversationAssign', {
+        agentId: args.assignedAgentId,
+        teamId: args.assignedTeamId,
+      });
+    }
+
+    if (args.tagIds) {
+      await apply('tags', mutations.conversationTag, 'conversationTag', { tagIds: args.tagIds });
+    }
+
+    if (!conversation) {
+      throw new Error('Provide at least one of state, assignedAgentId, assignedTeamId or tagIds');
+    }
+
+    return conversation;
   }
 
   async closeConversation(id: string): Promise<Conversation> {
-    return this.updateConversation({ id, state: 'closed' });
-  }
+    const payload = await this.client.mutate<{ conversation: Conversation }>(
+      mutations.conversationClose,
+      'conversationClose',
+      { conversationId: await this.client.resolveConversationId(id) }
+    );
 
-  async listMessages(conversationId: string, limit?: number): Promise<any[]> {
-    // Convert GraphQL ID format (cnv_12345) to REST format (12345)
-    const ticketId = conversationId.replace('cnv_', '');
-    const messages = await this.restClient.getTicketMessages(ticketId);
-    
-    // Apply limit if specified
-    if (limit && messages.length > limit) {
-      return messages.slice(0, limit);
-    }
-    
-    return messages;
+    return payload.conversation;
   }
 }
