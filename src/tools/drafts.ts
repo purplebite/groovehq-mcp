@@ -1,0 +1,174 @@
+import { randomUUID } from 'node:crypto';
+import { GrooveClient } from '../groove-client.js';
+import { queries, mutations } from '../utils/graphql-queries.js';
+import { Draft } from '../types/groove.js';
+
+interface ListDraftsArgs {
+  conversationId?: string;
+}
+
+interface CreateReplyDraftArgs {
+  conversationId: string;
+  body: string;
+  to?: string[];
+  cc?: string[];
+  bcc?: string[];
+  replyAll?: boolean;
+  note?: boolean;
+}
+
+interface DeleteDraftArgs {
+  draftId: string;
+  conversationId: string;
+}
+
+interface DraftTicket {
+  id: string;
+  number: number;
+  channel: { id: string };
+  contact: {
+    id: string;
+    email: string;
+    name: string | null;
+    firstName: string | null;
+    lastName: string | null;
+  } | null;
+}
+
+function escapeHtml(text: string): string {
+  return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+// Groove stores drafts as HTML, one <div> per line
+function toHtml(body: string): string {
+  if (/^\s*</.test(body)) return body;
+  return body
+    .split('\n')
+    .map(line => `<div>${escapeHtml(line) || '<br>'}</div>`)
+    .join('');
+}
+
+export class DraftTools {
+  constructor(private client: GrooveClient) {}
+
+  async listDrafts(args: ListDraftsArgs = {}): Promise<Draft[]> {
+    const conversationId = args.conversationId
+      ? await this.client.resolveConversationId(args.conversationId)
+      : undefined;
+    const drafts: Draft[] = [];
+    let after: string | undefined;
+    let hasNextPage = true;
+
+    while (hasNextPage) {
+      const response = await this.client.request<{
+        drafts: {
+          nodes: Draft[];
+          pageInfo: {
+            hasNextPage: boolean;
+            endCursor: string;
+          };
+        };
+      }>(queries.listDrafts, {
+        first: 50,
+        after,
+        filter: conversationId ? { conversationId } : undefined,
+      });
+
+      drafts.push(...response.drafts.nodes);
+      hasNextPage = response.drafts.pageInfo.hasNextPage;
+      after = response.drafts.pageInfo.endCursor;
+    }
+
+    // Groove ignores a filter it can't parse and returns every draft
+    return conversationId ? drafts.filter(d => d.conversationId === conversationId) : drafts;
+  }
+
+  async createReplyDraft(args: CreateReplyDraftArgs) {
+    if (args.note && (args.to || args.cc || args.bcc || args.replyAll)) {
+      throw new Error('A note draft has no recipients: leave out to, cc, bcc and replyAll');
+    }
+
+    const conversationId = await this.client.resolveConversationId(args.conversationId);
+    const response = await this.client.request<{ node: DraftTicket | null }>(
+      queries.getDraftTicket,
+      { id: conversationId }
+    );
+    const ticket = response.node;
+    if (!ticket) throw new Error(`Ticket not found: ${args.conversationId}`);
+
+    const body = toHtml(args.body);
+    const existing = await this.listDrafts({ conversationId });
+    const draftType = args.note ? 'NOTE' : 'REPLY';
+    const draftId = randomUUID();
+
+    await this.client.mutate(mutations.draftUpsert, 'draftUpsert', {
+      draftId,
+      conversationId,
+      version: 1,
+      draftType,
+      // Groove rejects REPLY_ALL as a type and any other key in the payload.
+      // The fields the web app uses belong in metadata.
+      payload: args.note ? { body } : this.replyPayload(ticket, body, args),
+      metadata: {
+        ticketId: String(ticket.number),
+        mailboxId: ticket.channel.id.replace(/^ch_/, ''),
+        ...(args.note ? {} : { replyType: args.replyAll ? 'reply-all' : 'reply' }),
+      },
+    });
+
+    const draft = (await this.listDrafts({ conversationId })).find(d => d.draftId === draftId);
+    if (!draft) throw new Error('Groove accepted the draft but did not store it');
+
+    return {
+      saved: true,
+      sent: false,
+      draftId,
+      ticket: ticket.number,
+      type: args.note ? 'note' : 'reply',
+      replyType: args.note ? undefined : args.replyAll ? 'reply-all' : 'reply',
+      to: draft.to,
+      cc: draft.cc,
+      bcc: draft.bcc,
+      body: draft.body,
+      visibleTo: draft.agent?.email,
+      inTheApp: `Nothing was sent. Open ticket #${ticket.number} in Groove as ${draft.agent?.email}: drafts are only visible to the agent who owns them.`,
+      warning: existing.some(d => d.draftType === draftType)
+        ? 'This ticket already had a draft of this type from this agent. Both now exist, and Groove may show only one.'
+        : undefined,
+    };
+  }
+
+  async deleteDraft(args: DeleteDraftArgs) {
+    const conversationId = await this.client.resolveConversationId(args.conversationId);
+    const drafts = await this.listDrafts({ conversationId });
+
+    // draftDelete takes only a draft ID, so the ticket is checked here
+    if (!drafts.some(d => d.draftId === args.draftId)) {
+      throw new Error(
+        `Draft ${args.draftId} is not on ticket ${args.conversationId}, or belongs to another agent`
+      );
+    }
+
+    await this.client.mutate(mutations.draftDelete, 'draftDelete', { draftId: args.draftId });
+
+    return { deleted: true, draftId: args.draftId };
+  }
+
+  private replyPayload(ticket: DraftTicket, body: string, args: CreateReplyDraftArgs) {
+    const contact = ticket.contact;
+    const recipient = (email: string) =>
+      contact && email.toLowerCase() === contact.email.toLowerCase()
+        ? { ...contact, __typename: 'Contact' }
+        : { email };
+
+    const to = args.to?.length ? args.to.map(recipient) : contact ? [recipient(contact.email)] : [];
+    if (!to.length) throw new Error('This ticket has no contact: pass a to address');
+
+    return {
+      to,
+      cc: (args.cc ?? []).map(email => ({ email })),
+      bcc: (args.bcc ?? []).map(email => ({ email })),
+      body,
+    };
+  }
+}

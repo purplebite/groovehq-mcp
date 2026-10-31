@@ -7,6 +7,9 @@ export interface Channel {
   color: string;
   state: 'ACTIVE' | 'INACTIVE' | 'DELETED';
   senderName?: string;
+  email?: string;
+  fromName?: string;
+  useAgentName?: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -139,4 +142,21 @@ export interface GraphQLError {
     code: string;
     [key: string]: any;
   };
+}
+
+export interface Draft {
+  __typename: string;
+  id: string;
+  draftId: string;
+  draftType: 'REPLY' | 'REPLY_ALL' | 'NOTE';
+  conversationId: string;
+  version: number;
+  createdAt: string;
+  updatedAt: string;
+  agent?: { id: string; email: string };
+  to?: unknown;
+  cc?: unknown;
+  bcc?: unknown;
+  subject?: string | null;
+  body?: string;
 }

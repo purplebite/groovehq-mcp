@@ -179,6 +179,62 @@ export const queries = {
     }
   `,
 
+  listDrafts: `
+    query ListDrafts($first: Int, $after: String, $filter: DraftFilter) {
+      drafts(first: $first, after: $after, filter: $filter) {
+        nodes {
+          __typename
+          id
+          draftId
+          draftType
+          conversationId
+          version
+          createdAt
+          updatedAt
+          agent {
+            id
+            email
+          }
+          ... on ReplyDraft {
+            to
+            cc
+            bcc
+            subject
+            body
+          }
+          ... on NoteDraft {
+            body
+          }
+        }
+        pageInfo {
+          hasNextPage
+          endCursor
+        }
+      }
+    }
+  `,
+
+  getDraftTicket: `
+    query GetDraftTicket($id: ID!) {
+      node(id: $id) {
+        ... on Conversation {
+          id
+          number
+          channel {
+            id
+          }
+          contact {
+            id
+            email
+            name
+            firstName
+            lastName
+          }
+        }
+      }
+    }
+  `,
+
   getConversationId: `
     query GetConversationId($number: Int!) {
       conversation(number: $number) {
@@ -302,6 +358,29 @@ export const queries = {
 };
 
 export const mutations = {
+  draftUpsert: `
+    mutation DraftUpsert($input: DraftUpsertInput!) {
+      draftUpsert(input: $input) {
+        errors {
+          message
+          path
+        }
+      }
+    }
+  `,
+
+  draftDelete: `
+    mutation DraftDelete($input: DraftDeleteInput!) {
+      draftDelete(input: $input) {
+        success
+        errors {
+          message
+          path
+        }
+      }
+    }
+  `,
+
   conversationCreateEmail: `
     mutation ConversationCreateEmail($input: ConversationCreateEmailInput!) {
       conversationCreateEmail(input: $input) {

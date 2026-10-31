@@ -13,6 +13,11 @@ const CHANNEL_FIELDS = `
     senderName
     createdAt
     updatedAt
+    ... on EmailChannel {
+      email
+      fromName
+      useAgentName
+    }
   }
 `;
 

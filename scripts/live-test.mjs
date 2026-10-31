@@ -6,13 +6,17 @@
 //
 //   GROOVE_API_TOKEN=... GROOVE_TEST_TO=you@example.com GROOVE_TEST_CHANNEL=ch_123 \
 //     npm run test:live -- --write                    sends 2 test mails
+//
+//   GROOVE_API_TOKEN=... GROOVE_TEST_TICKET=12345 \
+//     npm run test:live -- --drafts                   saves and deletes drafts, sends nothing
 
 import { spawn } from 'node:child_process';
 import { createInterface } from 'node:readline';
 import { fileURLToPath } from 'node:url';
 
 const write = process.argv.includes('--write');
-const { GROOVE_API_TOKEN, GROOVE_TEST_TO, GROOVE_TEST_CHANNEL } = process.env;
+const drafts = process.argv.includes('--drafts');
+const { GROOVE_API_TOKEN, GROOVE_TEST_TO, GROOVE_TEST_CHANNEL, GROOVE_TEST_TICKET } = process.env;
 
 if (!GROOVE_API_TOKEN) {
   console.error('Set GROOVE_API_TOKEN first.');
@@ -24,8 +28,14 @@ if (write && (!GROOVE_TEST_TO || !GROOVE_TEST_CHANNEL)) {
   process.exit(1);
 }
 
+if (drafts && !GROOVE_TEST_TICKET) {
+  console.error('--drafts needs GROOVE_TEST_TICKET.');
+  process.exit(1);
+}
+
 const server = spawn('node', [fileURLToPath(new URL('../dist/index.js', import.meta.url))], {
   stdio: ['pipe', 'pipe', 'ignore'],
+  env: { ...process.env, GROOVE_ALLOW_SEND: write ? '1' : '0', GROOVE_READ_ONLY: '0' },
 });
 const lines = createInterface({ input: server.stdout })[Symbol.asyncIterator]();
 let nextId = 1;
@@ -184,6 +194,62 @@ await test('unknown tickets give a clear error', async () => {
   expect((await fails('getConversation', { id: '999999999' })) === 'Ticket not found: 999999999', 'wrong error');
   expect((await fails('getConversation', { id: 'cnv_1' })) === 'Ticket not found or deleted', 'wrong error');
 });
+
+await test('sending tools are hidden without GROOVE_ALLOW_SEND', async () => {
+  const { result } = await rpc('tools/list');
+  const names = result.tools.map(tool => tool.name);
+  const hidden = !names.includes('sendMessage') && !names.includes('createConversation');
+  expect(hidden === !write, 'wrong tool list');
+  if (!write) {
+    expect((await fails('sendMessage', { conversationId: '1', to: 'a@b.c', body: 'x' }))?.includes('GROOVE_ALLOW_SEND'), 'not refused');
+  }
+});
+
+await test('listDrafts returns only drafts of the ticket', async () => {
+  const all = await call('listDrafts');
+  if (all.length) {
+    const own = await call('listDrafts', { conversationId: all[0].conversationId });
+    expect(own.every(row => row.conversationId === all[0].conversationId), 'wrong ticket');
+  }
+  return `${all.length} drafts`;
+});
+
+if (drafts) {
+  console.log('\nDrafts');
+  const ticket = GROOVE_TEST_TICKET;
+  const before = await call('getConversation', { id: ticket });
+  const start = (await call('listDrafts', { conversationId: ticket })).length;
+
+  await test('createReplyDraft saves a reply without sending', async () => {
+    const draft = await call('createReplyDraft', { conversationId: ticket, body: 'Automated draft test.\nSecond line, <b>escaped</b>.' });
+    expect(draft.saved && draft.sent === false, 'not saved');
+    expect(draft.to.length === 1, 'no default recipient');
+    expect(draft.body.includes('&lt;b&gt;'), 'text not escaped');
+    expect(await fails('deleteDraft', { draftId: draft.draftId, conversationId: '999999999' }), 'deleted across tickets');
+    expect((await call('deleteDraft', { draftId: draft.draftId, conversationId: ticket })).deleted, 'not deleted');
+  });
+
+  await test('createReplyDraft handles cc, bcc and reply-all', async () => {
+    const draft = await call('createReplyDraft', { conversationId: ticket, body: '<div>Reply-all test</div>', cc: ['cc@example.com'], bcc: ['bcc@example.com'], replyAll: true });
+    expect(draft.cc[0].email === 'cc@example.com' && draft.bcc[0].email === 'bcc@example.com', 'wrong recipients');
+    await call('deleteDraft', { draftId: draft.draftId, conversationId: ticket });
+  });
+
+  await test('createReplyDraft saves a note draft', async () => {
+    const draft = await call('createReplyDraft', { conversationId: ticket, body: 'Note draft test', note: true });
+    expect(draft.type === 'note', 'not a note');
+    expect(await fails('createReplyDraft', { conversationId: ticket, body: 'x', note: true, to: ['a@b.c'] }), 'note took recipients');
+    await call('deleteDraft', { draftId: draft.draftId, conversationId: ticket });
+  });
+
+  await test('drafts leave no trace on the ticket', async () => {
+    const after = await call('getConversation', { id: ticket });
+    expect(after.counts.messages === before.counts.messages, 'a message appeared');
+    expect(after.counts.notes === before.counts.notes, 'a note appeared');
+    expect(after.state === before.state, 'state changed');
+    expect((await call('listDrafts', { conversationId: ticket })).length === start, 'drafts left behind');
+  });
+}
 
 if (write) {
   const { createInterface: prompt } = await import('node:readline/promises');

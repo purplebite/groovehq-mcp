@@ -15,6 +15,7 @@ import { AgentTools } from './tools/agents.js';
 import { ChannelTools } from './tools/channels.js';
 import { TagTools } from './tools/tags.js';
 import { TeamTools } from './tools/teams.js';
+import { DraftTools } from './tools/drafts.js';
 import { KnowledgeBaseResources } from './resources/kb-articles.js';
 
 const apiToken = process.env.GROOVE_API_TOKEN;
@@ -25,6 +26,26 @@ if (!apiToken) {
   process.exit(1);
 }
 
+const readOnly = process.env.GROOVE_READ_ONLY === '1';
+const allowSend = process.env.GROOVE_ALLOW_SEND === '1' && !readOnly;
+
+const SEND_TOOLS = ['createConversation', 'sendMessage'];
+const WRITE_TOOLS = [
+  'updateConversation',
+  'closeConversation',
+  'createNote',
+  'createContact',
+  'updateContact',
+  'createReplyDraft',
+  'deleteDraft',
+];
+
+function isEnabled(tool: string): boolean {
+  if (SEND_TOOLS.includes(tool)) return allowSend;
+  if (WRITE_TOOLS.includes(tool)) return !readOnly;
+  return true;
+}
+
 const grooveClient = new GrooveClient(apiToken, apiUrl);
 const conversationTools = new ConversationTools(grooveClient);
 const messageTools = new MessageTools(grooveClient);
@@ -33,12 +54,13 @@ const agentTools = new AgentTools(grooveClient);
 const channelTools = new ChannelTools(grooveClient);
 const tagTools = new TagTools(grooveClient);
 const teamTools = new TeamTools(grooveClient);
+const draftTools = new DraftTools(grooveClient);
 const kbResources = new KnowledgeBaseResources(grooveClient);
 
 const server = new Server(
   {
     name: 'groovehq-mcp',
-    version: '0.1.1',
+    version: '0.2.0',
   },
   {
     capabilities: {
@@ -60,7 +82,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
             state: {
               type: 'string',
               enum: ['unread', 'opened', 'closed', 'snoozed'],
-              description: 'Filter by conversation state (opened also includes unread)',
+              description: 'Filter by conversation state. opened also includes unread, but leaves out snoozed: ask for snoozed separately to see every ticket that still needs work',
             },
             assignedAgentId: {
               type: 'string',
@@ -115,7 +137,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       },
       {
         name: 'createConversation',
-        description: 'Create a new conversation by sending an email',
+        description: 'SENDS AN EMAIL IMMEDIATELY to the given address and creates a ticket. Use only when the user explicitly asks to send this message.',
         inputSchema: {
           type: 'object',
           properties: {
@@ -226,7 +248,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       },
       {
         name: 'sendMessage',
-        description: 'Send an email reply in a conversation',
+        description: 'SENDS AN EMAIL IMMEDIATELY as a reply on a ticket. Use only when the user explicitly asks to send this message; to prepare a reply for review, use createReplyDraft.',
         inputSchema: {
           type: 'object',
           properties: {
@@ -262,6 +284,78 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
             },
           },
           required: ['conversationId', 'body'],
+        },
+      },
+      {
+        name: 'listDrafts',
+        description: 'List your own unsent drafts, optionally for one ticket. Read-only. Drafts of other agents are not visible through the API.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            conversationId: {
+              type: 'string',
+              description: 'Ticket number (e.g. 12345) or conversation ID',
+            },
+          },
+        },
+      },
+      {
+        name: 'createReplyDraft',
+        description: 'Save a reply or note on a ticket as a draft for a person to review. NEVER SENDS anything. Drafts always belong to an existing ticket and are visible only to the agent who owns the API token.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            conversationId: {
+              type: 'string',
+              description: 'Ticket number (e.g. 12345) or conversation ID',
+            },
+            body: {
+              type: 'string',
+              description: 'The draft text, as plain text or HTML',
+            },
+            to: {
+              type: 'array',
+              items: { type: 'string' },
+              description: "Recipient email addresses (default: the ticket's contact)",
+            },
+            cc: {
+              type: 'array',
+              items: { type: 'string' },
+              description: 'Cc email addresses',
+            },
+            bcc: {
+              type: 'array',
+              items: { type: 'string' },
+              description: 'Bcc email addresses',
+            },
+            replyAll: {
+              type: 'boolean',
+              description: 'Mark the draft as reply-all in the app',
+            },
+            note: {
+              type: 'boolean',
+              description: 'Save an internal note draft instead of a reply; no recipients allowed',
+            },
+          },
+          required: ['conversationId', 'body'],
+        },
+      },
+      {
+        name: 'deleteDraft',
+        description: 'Delete one of your own drafts from a ticket',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            draftId: {
+              type: 'string',
+              description: 'The draftId returned by listDrafts or createReplyDraft',
+            },
+            conversationId: {
+              type: 'string',
+              description: 'Ticket number (e.g. 12345) or conversation ID the draft belongs to',
+            },
+          },
+          required: ['draftId', 'conversationId'],
         },
       },
       {
@@ -454,7 +548,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
           required: ['id'],
         },
       },
-    ],
+    ].filter(tool => isEnabled(tool.name)),
   };
 });
 
@@ -462,6 +556,14 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
   const { name, arguments: args } = request.params;
 
   try {
+    if (!isEnabled(name)) {
+      throw new Error(
+        readOnly
+          ? `${name} is disabled: GROOVE_READ_ONLY is on`
+          : `${name} is disabled: it sends email, which needs GROOVE_ALLOW_SEND=1`
+      );
+    }
+
     switch (name) {
       case 'listConversations': {
         const conversations = await conversationTools.listConversations(args || {});
@@ -578,6 +680,53 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             {
               type: 'text',
               text: JSON.stringify(note, null, 2),
+            },
+          ],
+        };
+      }
+
+      case 'listDrafts': {
+        const drafts = await draftTools.listDrafts((args || {}) as { conversationId?: string });
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify(drafts, null, 2),
+            },
+          ],
+        };
+      }
+
+      case 'createReplyDraft': {
+        if (!args || typeof args.conversationId !== 'string' || typeof args.body !== 'string') {
+          throw new Error('Conversation ID and body are required');
+        }
+        const draft = await draftTools.createReplyDraft(
+          args as unknown as Parameters<DraftTools['createReplyDraft']>[0]
+        );
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify(draft, null, 2),
+            },
+          ],
+        };
+      }
+
+      case 'deleteDraft': {
+        if (!args || typeof args.draftId !== 'string' || typeof args.conversationId !== 'string') {
+          throw new Error('Draft ID and conversation ID are required');
+        }
+        const result = await draftTools.deleteDraft({
+          draftId: args.draftId,
+          conversationId: args.conversationId,
+        });
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify(result, null, 2),
             },
           ],
         };
