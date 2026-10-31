@@ -1,4 +1,3 @@
-import { randomUUID } from 'node:crypto';
 import { GrooveClient } from '../groove-client.js';
 import { queries, mutations } from '../utils/graphql-queries.js';
 import { Draft } from '../types/groove.js';
@@ -33,6 +32,14 @@ interface DraftTicket {
     firstName: string | null;
     lastName: string | null;
   } | null;
+}
+
+// Node 18 has no global crypto, and a draft ID only has to be unique
+function newDraftId(): string {
+  if (globalThis.crypto?.randomUUID) return globalThis.crypto.randomUUID();
+  return 'xxxxxxxx-xxxx-4xxx-8xxx-xxxxxxxxxxxx'.replace(/x/g, () =>
+    Math.floor(Math.random() * 16).toString(16)
+  );
 }
 
 function escapeHtml(text: string): string {
@@ -99,7 +106,7 @@ export class DraftTools {
     const body = toHtml(args.body);
     const existing = await this.listDrafts({ conversationId });
     const draftType = args.note ? 'NOTE' : 'REPLY';
-    const draftId = randomUUID();
+    const draftId = newDraftId();
 
     await this.client.mutate(mutations.draftUpsert, 'draftUpsert', {
       draftId,

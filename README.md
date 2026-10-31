@@ -60,6 +60,18 @@ Using a different MCP client? Have it run `npx -y groovehq-mcp` and set `GROOVE_
 
 > **Heads up:** the package is `groovehq-mcp`, with the `hq`. `groove-mcp` doesn't work.
 
+## Use as a library
+
+You can run the same tools over your own transport, for example in a Cloudflare Worker. `createGrooveServer` returns a new MCP `Server` and connects nothing itself:
+
+```ts
+import { createGrooveServer } from 'groovehq-mcp/server';
+
+const server = createGrooveServer({ token: 'your_token_here', readOnly: true });
+```
+
+`allowSend` and `apiUrl` are optional too. Sending stays off unless you set `allowSend: true`, and `readOnly` always wins.
+
 ## Handle with care
 
 This server can send real email to real customers. A few things keep that honest:

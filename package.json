@@ -1,9 +1,19 @@
 {
   "name": "groovehq-mcp",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Working MCP server for Groove HQ, updated for the current API and tested against a live account: search and read tickets, send email replies, add notes, and manage contacts.",
   "type": "module",
   "main": "dist/index.js",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./server": {
+      "types": "./dist/server.d.ts",
+      "default": "./dist/server.js"
+    }
+  },
   "bin": {
     "groovehq-mcp": "dist/index.js"
   },
