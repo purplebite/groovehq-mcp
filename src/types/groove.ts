@@ -73,6 +73,8 @@ export interface Contact {
   conversationCount?: number;
   createdAt: string;
   updatedAt: string;
+  lastSeenAt?: string | null;
+  secondaryEmails?: string[];
   companies?: {
     nodes: Array<{
       id: string;

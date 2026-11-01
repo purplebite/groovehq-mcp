@@ -24,9 +24,12 @@ export interface GrooveServerOptions {
   readOnly?: boolean;
   allowSend?: boolean;
   allowMerge?: boolean;
+  allowContactDelete?: boolean;
 }
 
 const SEND_TOOLS = ['createConversation', 'sendMessage'];
+const MERGE_TOOLS = ['mergeConversations', 'mergeContacts'];
+const CONTACT_DELETE_TOOLS = ['deleteContact', 'deleteContacts'];
 const WRITE_TOOLS = [
   'updateConversation',
   'closeConversation',
@@ -45,10 +48,12 @@ export function createGrooveServer(opts: GrooveServerOptions): Server {
   const readOnly = opts.readOnly === true;
   const allowSend = opts.allowSend === true && !readOnly;
   const allowMerge = opts.allowMerge !== false && !readOnly;
+  const allowContactDelete = opts.allowContactDelete !== false && !readOnly;
 
   function isEnabled(tool: string): boolean {
     if (SEND_TOOLS.includes(tool)) return allowSend;
-    if (tool === 'mergeConversations') return allowMerge;
+    if (MERGE_TOOLS.includes(tool)) return allowMerge;
+    if (CONTACT_DELETE_TOOLS.includes(tool)) return allowContactDelete;
     if (WRITE_TOOLS.includes(tool)) return !readOnly;
     return true;
   }
@@ -67,7 +72,7 @@ export function createGrooveServer(opts: GrooveServerOptions): Server {
   const server = new Server(
     {
       name: 'groovehq-mcp',
-      version: '0.4.0',
+      version: '0.5.0',
     },
     {
       capabilities: {
@@ -415,17 +420,46 @@ export function createGrooveServer(opts: GrooveServerOptions): Server {
         },
         {
           name: 'listContacts',
-          description: 'List contacts with optional search. Returns one page; if pageInfo.hasNextPage is true, more results exist.',
+          description: 'List contacts with optional search, with their ticket counts. Returns one page; if pageInfo.hasNextPage is true, more results exist.',
           inputSchema: {
             type: 'object',
             properties: {
               search: {
                 type: 'string',
-                description: 'Search string to filter contacts',
+                description: 'Search string to filter contacts. Also finds part of a name or address',
+              },
+              email: {
+                type: 'string',
+                description: 'Find the contact with exactly this email address',
+              },
+              orderBy: {
+                type: 'object',
+                description: 'Sort order',
+                properties: {
+                  field: {
+                    type: 'string',
+                    enum: ['COMPANY_NAME', 'CONVERSATION_COUNT', 'CREATED_AT', 'EMAIL', 'JOB_TITLE', 'LAST_SEEN_AT', 'NAME', 'UPDATED_AT'],
+                  },
+                  direction: {
+                    type: 'string',
+                    enum: ['ASC', 'DESC'],
+                    default: 'ASC',
+                  },
+                },
+                required: ['field'],
+              },
+              orphansOnly: {
+                type: 'boolean',
+                description:
+                  'Only contacts with 0 tickets. Reads at most 500 contacts per call, so call again with after for more. Never deletes anything. A contact can have 0 tickets and still have been CCed or have written mail in a merged ticket',
+              },
+              olderThanDays: {
+                type: 'number',
+                description: 'With orphansOnly: skip contacts created in the last N days',
               },
               limit: {
                 type: 'number',
-                description: 'Maximum number of contacts to return per page',
+                description: 'Maximum number of contacts per page. Groove returns at most 100. With orphansOnly it stops reading at this many, default 50, and can return slightly more',
                 default: 20,
               },
               after: {
@@ -433,6 +467,74 @@ export function createGrooveServer(opts: GrooveServerOptions): Server {
                 description: 'Cursor for pagination',
               },
             },
+          },
+        },
+        {
+          name: 'mergeContacts',
+          description:
+            'Permanently merge one contact into another, for example a typo address into the right one. This cannot be undone, so always confirm with the user first. ' +
+            'The source contact and its address disappear. Its tickets move to the target, and its mail then shows the target as sender',
+          annotations: { destructiveHint: true },
+          inputSchema: {
+            type: 'object',
+            properties: {
+              source: {
+                type: 'string',
+                description: 'Contact that disappears: exact email address or contact ID',
+              },
+              target: {
+                type: 'string',
+                description: 'Contact that stays: exact email address or contact ID',
+              },
+            },
+            required: ['source', 'target'],
+          },
+        },
+        {
+          name: 'deleteContact',
+          description:
+            'Permanently delete one contact by exact email address, which also removes it from recipient suggestions. A contact with tickets cannot be deleted: use mergeContacts. ' +
+            'Without confirm it only shows what would be deleted. Always show that to the user first. ' +
+            'Mail this contact wrote in a merged ticket loses its sender',
+          annotations: { destructiveHint: true },
+          inputSchema: {
+            type: 'object',
+            properties: {
+              email: {
+                type: 'string',
+                description: 'Exact email address of the contact',
+              },
+              confirm: {
+                type: 'boolean',
+                description: 'Really delete it. Only after the user agreed',
+                default: false,
+              },
+            },
+            required: ['email'],
+          },
+        },
+        {
+          name: 'deleteContacts',
+          description:
+            'Permanently delete up to 100 contacts by ID, one by one. A contact with tickets is skipped. ' +
+            'Without confirm it only shows what would be deleted. Always show that to the user first. ' +
+            'Mail these contacts wrote in merged tickets loses its sender',
+          annotations: { destructiveHint: true },
+          inputSchema: {
+            type: 'object',
+            properties: {
+              contactIds: {
+                type: 'array',
+                items: { type: 'string' },
+                description: 'Contact IDs to delete, at most 100',
+              },
+              confirm: {
+                type: 'boolean',
+                description: 'Really delete them. Only after the user agreed',
+                default: false,
+              },
+            },
+            required: ['contactIds'],
           },
         },
         {
@@ -614,9 +716,11 @@ export function createGrooveServer(opts: GrooveServerOptions): Server {
       if (!isEnabled(name)) {
         const reason = readOnly
           ? 'GROOVE_READ_ONLY is on'
-          : name === 'mergeConversations'
+          : MERGE_TOOLS.includes(name)
             ? 'merging is turned off with GROOVE_ALLOW_MERGE=0'
-            : 'it sends email, which needs GROOVE_ALLOW_SEND=1';
+            : CONTACT_DELETE_TOOLS.includes(name)
+              ? 'deleting contacts is turned off with GROOVE_ALLOW_CONTACT_DELETE=0'
+              : 'it sends email, which needs GROOVE_ALLOW_SEND=1';
         throw new Error(`${name} is disabled: ${reason}`);
       }
 
@@ -813,6 +917,30 @@ export function createGrooveServer(opts: GrooveServerOptions): Server {
               },
             ],
           };
+        }
+
+        case 'mergeContacts': {
+          if (!args || typeof args.source !== 'string' || typeof args.target !== 'string') {
+            throw new Error('source and target are required');
+          }
+          const result = await contactTools.mergeContacts(args as any);
+          return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
+        }
+
+        case 'deleteContact': {
+          if (!args || typeof args.email !== 'string') {
+            throw new Error('email is required');
+          }
+          const result = await contactTools.deleteContact(args as any);
+          return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
+        }
+
+        case 'deleteContacts': {
+          if (!args || !Array.isArray(args.contactIds)) {
+            throw new Error('contactIds is required');
+          }
+          const result = await contactTools.deleteContacts(args as any);
+          return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
         }
 
         case 'getContact': {

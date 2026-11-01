@@ -13,6 +13,9 @@
 //   GROOVE_API_TOKEN=... GROOVE_TEST_TO=you@example.com GROOVE_TEST_CHANNEL=ch_123 \
 //     npm run test:live -- --merge                    sends 3 test mails, merges those tickets
 //
+//   GROOVE_API_TOKEN=... GROOVE_TEST_TO=you@example.com npm run test:live -- --contacts
+//                                                     only this: creates and deletes contacts, sends nothing
+//
 //   GROOVE_API_TOKEN=... npm run test:live -- --update
 //                                                     changes a [TEST] ticket and puts it back
 
@@ -24,6 +27,7 @@ const write = process.argv.includes('--write');
 const drafts = process.argv.includes('--drafts');
 const update = process.argv.includes('--update');
 const merge = process.argv.includes('--merge');
+const contactsOnly = process.argv.includes('--contacts');
 const sends = write || merge;
 const { GROOVE_API_TOKEN, GROOVE_TEST_TO, GROOVE_TEST_CHANNEL, GROOVE_TEST_TICKET } = process.env;
 
@@ -39,6 +43,11 @@ if (sends && (!GROOVE_TEST_TO || !GROOVE_TEST_CHANNEL)) {
 
 if (drafts && !GROOVE_TEST_TICKET) {
   console.error('--drafts needs GROOVE_TEST_TICKET.');
+  process.exit(1);
+}
+
+if (contactsOnly && !GROOVE_TEST_TO) {
+  console.error('--contacts needs GROOVE_TEST_TO, an address that has tickets.');
   process.exit(1);
 }
 
@@ -100,6 +109,92 @@ await rpc('initialize', {
   clientInfo: { name: 'live-test', version: '1' },
 });
 server.stdin.write(JSON.stringify({ jsonrpc: '2.0', method: 'notifications/initialized' }) + '\n');
+
+if (contactsOnly) {
+  console.log('\nContacts');
+  const [name, domain] = GROOVE_TEST_TO.split('@');
+  const stamp = Date.now();
+  const address = letter => `${name}+${letter}${stamp}@${domain}`;
+  const exists = async email => (await call('listContacts', { email })).contacts.length === 1;
+
+  // Groove's email lookup takes a moment to catch up with a change
+  const settles = async (email, wanted) => {
+    for (let tries = 0; tries < 10; tries++) {
+      if ((await exists(email)) === wanted) return true;
+      await new Promise(resolve => setTimeout(resolve, 1000));
+    }
+    return false;
+  };
+  const create = async letter => {
+    const contact = await call('createContact', { email: address(letter), firstName: 'Test', lastName: letter.toUpperCase() });
+    expect(await settles(contact.email, true), 'new contact not found');
+    return contact;
+  };
+  const owner = (await call('listContacts', { email: GROOVE_TEST_TO })).contacts[0];
+
+  await test('listContacts finds an exact address and ignores capitals', async () => {
+    expect(owner?.email === GROOVE_TEST_TO, 'not found');
+    expect(owner.conversationCount > 0, 'GROOVE_TEST_TO needs tickets');
+    expect((await call('listContacts', { email: GROOVE_TEST_TO.toUpperCase() })).contacts.length === 1, 'capitals matter');
+    expect(!(await call('listContacts', { email: name })).contacts.length, 'matched part of an address');
+  });
+
+  await test('orphansOnly reads at most 500 contacts and returns only zeros', async () => {
+    const result = await call('listContacts', { orphansOnly: true, limit: 10 });
+    expect(result.contactsRead <= 500, 'read too many');
+    expect(result.contacts.length && result.contacts.every(row => row.conversationCount === 0), 'wrong contacts');
+    return `read ${result.contactsRead}, found ${result.contacts.length}`;
+  });
+
+  await test('deleteContact only shows what it would do without confirm', async () => {
+    const contact = await create('a');
+    const result = await call('deleteContact', { email: contact.email });
+    expect(result.deleted === false && result.wouldDelete.id === contact.id, 'wrong result');
+    expect(await exists(contact.email), 'deleted without confirm');
+    expect((await call('deleteContact', { email: contact.email, confirm: true })).deleted, 'not deleted');
+    expect(await settles(contact.email, false), 'still there');
+  });
+
+  await test('deleteContact finds nothing for an unknown address', async () => {
+    expect((await call('deleteContact', { email: address('nobody'), confirm: true })).found === false, 'wrong result');
+  });
+
+  await test('a contact with tickets cannot be deleted', async () => {
+    const message = await fails('deleteContact', { email: GROOVE_TEST_TO, confirm: true });
+    expect(message?.includes('mergeContacts'), 'not refused');
+    expect(await exists(GROOVE_TEST_TO), 'deleted');
+  });
+
+  await test('deleteContacts deletes orphans and skips contacts with tickets', async () => {
+    const contact = await create('b');
+    const contactIds = [contact.id, owner.id];
+    const dry = await call('deleteContacts', { contactIds });
+    expect(dry.results[0].status === 'would delete' && dry.results[1].status === 'skipped', 'wrong dry run');
+    expect(await exists(contact.email), 'deleted without confirm');
+    const result = await call('deleteContacts', { contactIds, confirm: true });
+    expect(result.deleted === 1 && result.skipped === 1, 'wrong result');
+    expect((await settles(contact.email, false)) && (await exists(GROOVE_TEST_TO)), 'wrong contacts deleted');
+  });
+
+  await test('deleteContacts refuses more than 100 contacts', async () => {
+    const contactIds = Array.from({ length: 101 }, (_, index) => `co_${index}`);
+    expect(await fails('deleteContacts', { contactIds }), 'not refused');
+  });
+
+  await test('mergeContacts removes the source and keeps the target', async () => {
+    const source = await create('c');
+    const target = await create('d');
+    expect(await fails('mergeContacts', { source: source.email, target: source.id }), 'merged into itself');
+    const result = await call('mergeContacts', { source: source.email, target: target.id });
+    expect(result.merged && result.contact.id === target.id, 'wrong result');
+    expect((await settles(source.email, false)) && (await exists(target.email)), 'wrong contact left');
+    await call('deleteContact', { email: target.email, confirm: true });
+  });
+
+  server.kill();
+  console.log(`\n${passed} passed, ${failed} failed`);
+  process.exit(failed ? 1 : 0);
+}
 
 const { conversations: closed } = await call('listConversations', { state: 'closed', limit: 50 });
 const ticket = closed[0];

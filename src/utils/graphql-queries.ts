@@ -103,6 +103,8 @@ export const CONTACT_FIELDS = `
   conversationCount
   createdAt
   updatedAt
+  lastSeenAt
+  secondaryEmails
   companies {
     nodes {
       id
@@ -270,8 +272,9 @@ export const queries = {
   `,
 
   listContacts: `
-    query ListContacts($first: Int, $after: String, $filter: ContactFilter) {
-      contacts(first: $first, after: $after, filter: $filter) {
+    query ListContacts($first: Int, $after: String, $filter: ContactFilter, $orderBy: ContactOrder) {
+      contacts(first: $first, after: $after, filter: $filter, orderBy: $orderBy) {
+        totalCount
         nodes {
           ${CONTACT_FIELDS}
         }
@@ -535,6 +538,32 @@ export const mutations = {
         target {
           ${CONVERSATION_FIELDS}
         }
+        errors {
+          message
+          path
+        }
+      }
+    }
+  `,
+
+  contactMerge: `
+    mutation ContactMerge($input: ContactMergeInput!) {
+      contactMerge(input: $input) {
+        target {
+          ${CONTACT_FIELDS}
+        }
+        errors {
+          message
+          path
+        }
+      }
+    }
+  `,
+
+  contactDelete: `
+    mutation ContactDelete($input: ContactDeleteInput!) {
+      contactDelete(input: $input) {
+        deletedContactId
         errors {
           message
           path
