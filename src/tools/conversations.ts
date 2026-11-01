@@ -2,6 +2,7 @@ import { GrooveClient } from '../groove-client.js';
 import { queries, mutations } from '../utils/graphql-queries.js';
 import { Conversation } from '../types/groove.js';
 import { DraftTools } from './drafts.js';
+import { AttachmentArg, uploadAttachments } from './attachments.js';
 
 interface ListConversationsArgs {
   state?: 'unread' | 'opened' | 'closed' | 'snoozed';
@@ -53,6 +54,7 @@ interface CreateConversationArgs {
   tagIds?: string[];
   cc?: string[];
   bcc?: string[];
+  attachments?: AttachmentArg[];
 }
 
 interface LogConversationArgs {
@@ -66,6 +68,7 @@ interface LogConversationArgs {
   assignedAgentId?: string;
   assignedTeamId?: string;
   skipNotifications?: boolean;
+  attachments?: AttachmentArg[];
 }
 
 interface DeleteConversationArgs {
@@ -85,6 +88,7 @@ interface ForwardConversationArgs {
   subject?: string;
   cc?: string[];
   bcc?: string[];
+  attachments?: AttachmentArg[];
 }
 
 interface MergeConversationsArgs {
@@ -154,6 +158,7 @@ export class ConversationTools {
           to: [{ email: args.to, name: args.toName || args.to }],
           cc: args.cc?.map(email => ({ email, name: email })),
           bcc: args.bcc?.map(email => ({ email, name: email })),
+          attachments: await uploadAttachments(this.client, args.attachments),
         },
         assigned: { agentId: args.assignedAgentId, teamId: args.assignedTeamId },
         tagIds: args.tagIds,
@@ -175,6 +180,7 @@ export class ConversationTools {
           body: args.body,
           to: { email: args.to, name: args.toName || args.to },
           phone: args.phone,
+          attachments: await uploadAttachments(this.client, args.attachments),
         },
         assigned:
           args.assignedAgentId || args.assignedTeamId
@@ -318,7 +324,7 @@ export class ConversationTools {
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       if (/hidden due to permissions/i.test(message)) {
-        throw new Error(`This account has no access to mailbox ${channelId}, so the ticket would get stuck there`);
+        throw new Error(`This account has no access to mailbox ${channelId}, so it couldn't reach the ticket after the move`);
       }
       throw error;
     }
@@ -360,6 +366,7 @@ export class ConversationTools {
         bcc: args.bcc,
         body: args.body,
         subject: args.subject,
+        attachments: await uploadAttachments(this.client, args.attachments),
         state: ticket.state,
         snoozeUntil: ticket.snoozed?.until,
       }

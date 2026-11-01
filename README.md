@@ -28,7 +28,8 @@ Both repos use Groove's REST API for conversations. This one runs on GraphQL onl
 - `sendMessage`: send an email reply
 - `undoSend`: cancel a mail right after sending it
 - `createNote`: leave an internal note
-- `editNote`, `deleteNote`: change or remove an internal note
+- `editNote`, `reactToNote`, `deleteNote`: change, react to, or remove an internal note
+- Attach files to mail, notes, and logged tickets with `attachments`, from a public `https` link or as base64
 - `createReplyDraft`: save a reply or note as a draft for someone to review. It never sends
 - `listDrafts`, `deleteDraft`: see and remove your own drafts
 
@@ -88,6 +89,7 @@ This server can send real email to real customers. A few things keep that honest
 - **Sending is off by default.** `sendMessage`, `createConversation`, `forwardConversation`, and `undoSend` only appear when you set `GROOVE_ALLOW_SEND=1`.
 - **Read-only mode.** Set `GROOVE_READ_ONLY=1` to leave out every tool that writes, including drafts.
 - **Recipients are always explicit.** `createConversation` and `sendMessage` require a `to` address, nothing is sent to a default, and `cc` and `bcc` are optional.
+- **Attachments are checked first.** Links must use `https`, and local or private addresses are refused. Files can be up to 20 MB from a link or 5 MB as base64, with at most 25 per message.
 - **Merging is permanent.** Only the target ticket stays, with its own contact, subject, and assignee. Replies and notes move over, tags are combined, and an open ticket reopens the target. `mergeConversations` is marked as destructive, and it refuses tickets with different contacts or your own drafts on the merged ticket unless told otherwise. Set `GROOVE_ALLOW_MERGE=0` to turn off merging tickets and contacts.
 - **Deleting is limited.** A deleted ticket can always be restored, unless you set `GROOVE_ALLOW_PERMANENT_DELETE=1` and pass `permanent: true`. A deleted contact is gone for good, so contacts with tickets can't be deleted at all: merge them first with `mergeContacts`. Other contacts are only deleted with `confirm: true`, at most 100 per call.
 - **Failed updates tell you what happened.** Groove has no all-or-nothing update, so `updateConversation` can succeed halfway. When it does, the error says which steps already went through.
@@ -105,9 +107,8 @@ Your MCP client will usually ask before a tool runs. For sending mail, it's a go
 - **0 tickets doesn't always mean unused.** A contact's mail can sit in someone else's ticket after a merge. If you delete that contact, the mail stays but no longer shows who wrote it, and there's no practical way to check beforehand which contacts this affects.
 - **Orphans come in batches.** `listContacts` with `orphansOnly` reads at most 500 contacts per call. Call it again for more, but Groove's list isn't strictly sorted and can repeat contacts, so there's no guarantee you've seen them all.
 - **Companies come from mail domains.** Groove creates them by itself, often without a name, and a contact can have several. `updateContact` adds or removes one and keeps the others, and it also manages extra email addresses.
-- **Mailbox moves need access.** A ticket can't be moved to a mailbox your account can't reach, because it would get stuck there.
+- **Mailbox moves need access.** A ticket can't be moved to a mailbox your account can't reach, because you couldn't access the ticket afterwards.
 - **`listMessages` can show too much.** Groove can still return deleted notes, mail moved to another ticket, and undone mail as an empty message.
-- **Some things aren't in here yet.** You can't send attachments, add reactions to notes, or link tickets to other tools.
 
 ## Development
 
@@ -161,7 +162,7 @@ To test contacts, add `--contacts` and set `GROOVE_TEST_TO` to an address that h
 GROOVE_API_TOKEN=your_token_here GROOVE_TEST_TO=you@example.com npm run test:live -- --contacts
 ```
 
-To test ticket changes, add `--tickets`. It asks first, then sends a forward and a reply that it undoes, to plus addresses of `GROOVE_TEST_TO`, and changes and deletes test tickets:
+To test ticket changes and attachments, add `--tickets`. It asks first, then sends 4 test mails to plus addresses of `GROOVE_TEST_TO`, and changes and deletes test tickets:
 
 ```bash
 GROOVE_API_TOKEN=your_token_here GROOVE_TEST_TO=you@example.com GROOVE_TEST_CHANNEL=ch_123 npm run test:live -- --tickets

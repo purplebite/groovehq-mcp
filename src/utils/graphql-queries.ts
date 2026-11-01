@@ -245,6 +245,23 @@ export const queries = {
     }
   `,
 
+  // Asking for errors on this payload crashes it, so they are left out
+  uploadPayloadGenerate: `
+    mutation UploadPayloadGenerate($input: UploadPayloadGenerateInput!) {
+      uploadPayloadGenerate(input: $input) {
+        key
+        request {
+          method
+          url
+          data {
+            name
+            value
+          }
+        }
+      }
+    }
+  `,
+
   getChannelTicket: `
     query GetChannelTicket($filter: ConversationFilter) {
       conversations(first: 1, filter: $filter) {
@@ -564,6 +581,17 @@ export const mutations = {
         conversation {
           ${CONVERSATION_FIELDS}
         }
+        errors {
+          message
+          path
+        }
+      }
+    }
+  `,
+
+  conversationToggleNoteReaction: `
+    mutation ConversationToggleNoteReaction($input: conversationToggleNoteReactionInput!) {
+      conversationToggleNoteReaction(input: $input) {
         errors {
           message
           path

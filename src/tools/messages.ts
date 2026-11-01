@@ -1,6 +1,7 @@
 import { GrooveClient } from '../groove-client.js';
 import { queries, mutations } from '../utils/graphql-queries.js';
 import { Conversation, Message } from '../types/groove.js';
+import { AttachmentArg, uploadAttachments } from './attachments.js';
 
 interface ListMessagesArgs {
   conversationId: string;
@@ -13,11 +14,13 @@ interface SendMessageArgs {
   body: string;
   cc?: string[];
   bcc?: string[];
+  attachments?: AttachmentArg[];
 }
 
 interface CreateNoteArgs {
   conversationId: string;
   body: string;
+  attachments?: AttachmentArg[];
 }
 
 export class MessageTools {
@@ -69,6 +72,7 @@ export class MessageTools {
         body: args.body,
         cc: args.cc,
         bcc: args.bcc,
+        attachments: await uploadAttachments(this.client, args.attachments),
       }
     );
 
@@ -93,6 +97,16 @@ export class MessageTools {
     return { edited: true, messageId };
   }
 
+  async reactToNote(messageId: string, reaction: string) {
+    await this.client.mutate(
+      mutations.conversationToggleNoteReaction,
+      'conversationToggleNoteReaction',
+      { messageId, reaction }
+    );
+
+    return { toggled: true, messageId, reaction };
+  }
+
   async deleteNote(messageId: string) {
     await this.client.mutate(mutations.conversationDeleteNote, 'conversationDeleteNote', {
       messageId,
@@ -108,6 +122,7 @@ export class MessageTools {
       {
         conversationId: await this.client.resolveConversationId(args.conversationId),
         body: args.body,
+        attachments: await uploadAttachments(this.client, args.attachments),
       }
     );
 

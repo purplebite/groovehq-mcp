@@ -17,7 +17,7 @@
 //                                                     only this: creates and deletes contacts, sends nothing
 //
 //   GROOVE_API_TOKEN=... GROOVE_TEST_TO=you@example.com GROOVE_TEST_CHANNEL=ch_123 \
-//     npm run test:live -- --tickets                  only this: sends 1 test mail, changes and deletes test tickets
+//     npm run test:live -- --tickets                  only this: sends 4 test mails, changes and deletes test tickets
 //
 //   GROOVE_API_TOKEN=... npm run test:live -- --update
 //                                                     changes a [TEST] ticket and puts it back
@@ -118,7 +118,7 @@ if (ticketsOnly) {
   console.log('\nTickets');
   const { createInterface: prompt } = await import('node:readline/promises');
   const input = prompt({ input: process.stdin, output: process.stdout });
-  const answer = await input.question(`\nSend a test mail to a plus address of ${GROOVE_TEST_TO}? Type yes: `);
+  const answer = await input.question(`\nSend 4 test mails to plus addresses of ${GROOVE_TEST_TO}? Type yes: `);
   input.close();
   if (answer !== 'yes') {
     console.log('Skipped the ticket tests.');
@@ -172,6 +172,7 @@ if (ticketsOnly) {
     await call('createNote', { conversationId: id, body: `Note ${stamp}` });
     const note = (await call('listMessages', { conversationId: id })).find(row => row.bodyPlainText?.includes(`Note ${stamp}`));
     await call('editNote', { messageId: note.id, body: `Edited ${stamp}` });
+    expect((await call('reactToNote', { messageId: note.id, reaction: '👍' })).toggled, 'no reaction');
     const edited = (await call('listMessages', { conversationId: id })).find(row => row.id === note.id);
     expect(edited.bodyPlainText.includes(`Edited ${stamp}`), 'not edited');
     expect((await call('deleteNote', { messageId: note.id })).deleted, 'not deleted');
@@ -200,6 +201,82 @@ if (ticketsOnly) {
     expect((await call('restoreConversation', { id: otherId })).state === 'OPENED', 'not restored');
     expect((await call('deleteConversation', { id: otherId, permanent: true })).permanent, 'not permanent');
     expect(await fails('getConversation', { id: otherId }), 'still there');
+  });
+
+  const fileText = `Attachment test ${stamp}`;
+  const file = { fileName: `test-${stamp}.txt`, contentType: 'text/plain', contentBase64: Buffer.from(fileText).toString('base64') };
+  const attached = async ticketId =>
+    (await call('listMessages', { conversationId: ticketId })).flatMap(row => row.attachments?.nodes ?? []);
+
+  await test('createNote attaches a base64 file', async () => {
+    await call('createNote', { conversationId: id, body: 'Base64 attachment.', attachments: [file] });
+    const [stored] = await attached(id);
+    expect(stored?.fileName === file.fileName, 'file missing');
+    const copy = await fetch(stored.url);
+    expect((await copy.text()) === fileText, 'wrong content');
+  });
+
+  await test('createNote attaches a file from a url', async () => {
+    const [stored] = await attached(id);
+    await call('createNote', { conversationId: id, body: 'URL attachment.', attachments: [{ fileName: `url-${stamp}.txt`, url: stored.url }] });
+    expect((await attached(id)).some(row => row.fileName === `url-${stamp}.txt`), 'file missing');
+  });
+
+  await test('bad attachments are refused before anything is sent', async () => {
+    const urls = [
+      'http://example.com/file.txt',
+      'https://localhost/file.txt',
+      'https://127.0.0.1/file.txt',
+      'https://10.0.0.1/file.txt',
+      'https://192.168.1.1/file.txt',
+      'https://169.254.169.254/latest/meta-data',
+      'https://[::1]/file.txt',
+      'https://server.internal/file.txt',
+    ];
+    const notes = (await read()).counts.notes;
+    for (const url of urls) {
+      expect(await fails('createNote', { conversationId: id, body: 'x', attachments: [{ fileName: 'x.txt', url }] }), `allowed ${url}`);
+    }
+    expect(await fails('createNote', { conversationId: id, body: 'x', attachments: [{ fileName: 'x.txt' }] }), 'no content allowed');
+    expect(await fails('createNote', { conversationId: id, body: 'x', attachments: [{ ...file, url: 'https://example.com/x' }] }), 'both allowed');
+    const tooBig = Buffer.alloc(5 * 1024 * 1024 + 1).toString('base64');
+    expect(await fails('createNote', { conversationId: id, body: 'x', attachments: [{ fileName: 'big.bin', contentBase64: tooBig }] }), 'too big allowed');
+    expect((await read()).counts.notes === notes, 'a note was added');
+  });
+
+  await test('logConversation attaches a file', async () => {
+    const result = await call('logConversation', {
+      channelId: GROOVE_TEST_CHANNEL,
+      to: GROOVE_TEST_TO,
+      subject: '[TEST] groovehq-mcp log attachment',
+      body: 'Log attachment.',
+      state: 'closed',
+      skipNotifications: true,
+      attachments: [file],
+    });
+    expect(result.ticket.counts.attachments === 1, 'file missing');
+  });
+
+  await test('sendMessage sends a file', async () => {
+    await call('sendMessage', { conversationId: id, to: `${local}+file@${domain}`, body: 'Automated attachment test.', attachments: [file] });
+    expect((await attached(id)).filter(row => row.fileName === file.fileName).length >= 2, 'file missing');
+  });
+
+  await test('forwardConversation sends a file', async () => {
+    const forwarded = await call('forwardConversation', { conversationId: id, to: [`${local}+fwdfile@${domain}`], body: 'Automated forward with a file.', attachments: [file] });
+    expect(forwarded.counts.attachments >= 1, 'file missing');
+  });
+
+  await test('createConversation sends a file', async () => {
+    const created = await call('createConversation', {
+      channelId: GROOVE_TEST_CHANNEL,
+      to: `${local}+newfile@${domain}`,
+      subject: '[TEST] groovehq-mcp new ticket with a file',
+      body: 'Automated new ticket with a file.',
+      attachments: [file],
+    });
+    expect(created.counts.attachments === 1, 'file missing');
+    await call('closeConversation', { id: String(created.number) });
   });
 
   await test('closeConversation closes the test ticket', async () => {

@@ -27,6 +27,21 @@ export interface GrooveServerOptions {
   allowPermanentDelete?: boolean;
 }
 
+const ATTACHMENTS_SCHEMA = {
+  type: 'array',
+  description: 'Files to attach, at most 25. Each has a fileName and either a url (https, up to 20 MB) or contentBase64 (up to 5 MB)',
+  items: {
+    type: 'object',
+    properties: {
+      fileName: { type: 'string', description: 'File name, with its extension' },
+      url: { type: 'string', description: 'Public https link to the file' },
+      contentBase64: { type: 'string', description: 'File content as base64. Use url for larger files' },
+      contentType: { type: 'string', description: 'MIME type, for example application/pdf' },
+    },
+    required: ['fileName'],
+  },
+};
+
 const SEND_TOOLS = ['createConversation', 'sendMessage', 'forwardConversation', 'undoSend'];
 const MERGE_TOOLS = ['mergeConversations', 'mergeContacts'];
 const WRITE_TOOLS = [
@@ -36,6 +51,7 @@ const WRITE_TOOLS = [
   'deleteContacts',
   'restoreConversation',
   'editNote',
+  'reactToNote',
   'deleteNote',
   'updateConversation',
   'closeConversation',
@@ -78,7 +94,7 @@ export function createGrooveServer(opts: GrooveServerOptions): Server {
   const server = new Server(
     {
       name: 'groovehq-mcp',
-      version: '0.6.1',
+      version: '0.7.0',
     },
     {
       capabilities: {
@@ -202,6 +218,7 @@ export function createGrooveServer(opts: GrooveServerOptions): Server {
                 items: { type: 'string' },
                 description: 'Email addresses to send a hidden copy to',
               },
+              attachments: ATTACHMENTS_SCHEMA,
             },
             required: ['channelId', 'to', 'subject', 'body'],
           },
@@ -255,6 +272,7 @@ export function createGrooveServer(opts: GrooveServerOptions): Server {
                 type: 'boolean',
                 description: 'Do not notify agents about the new ticket',
               },
+              attachments: ATTACHMENTS_SCHEMA,
             },
             required: ['channelId', 'to', 'subject', 'body'],
           },
@@ -418,6 +436,7 @@ export function createGrooveServer(opts: GrooveServerOptions): Server {
                 items: { type: 'string' },
                 description: 'Email addresses to send a hidden copy to',
               },
+              attachments: ATTACHMENTS_SCHEMA,
             },
             required: ['conversationId', 'to', 'body'],
           },
@@ -456,6 +475,24 @@ export function createGrooveServer(opts: GrooveServerOptions): Server {
               },
             },
             required: ['messageId', 'body'],
+          },
+        },
+        {
+          name: 'reactToNote',
+          description: 'Add a reaction to an internal note, or remove it if this agent already gave that reaction. Groove does not show reactions through the API.',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              messageId: {
+                type: 'string',
+                description: 'ID of the note',
+              },
+              reaction: {
+                type: 'string',
+                description: 'The emoji, for example 👍',
+              },
+            },
+            required: ['messageId', 'reaction'],
           },
         },
         {
@@ -563,6 +600,7 @@ export function createGrooveServer(opts: GrooveServerOptions): Server {
                 items: { type: 'string' },
                 description: 'Email addresses to send a hidden copy to',
               },
+              attachments: ATTACHMENTS_SCHEMA,
             },
             required: ['conversationId', 'to', 'body'],
           },
@@ -581,6 +619,7 @@ export function createGrooveServer(opts: GrooveServerOptions): Server {
                 type: 'string',
                 description: 'The note content',
               },
+              attachments: ATTACHMENTS_SCHEMA,
             },
             required: ['conversationId', 'body'],
           },
@@ -1137,6 +1176,14 @@ export function createGrooveServer(opts: GrooveServerOptions): Server {
             throw new Error('messageId and body are required');
           }
           const result = await messageTools.editNote(args.messageId, args.body);
+          return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
+        }
+
+        case 'reactToNote': {
+          if (!args || typeof args.messageId !== 'string' || typeof args.reaction !== 'string') {
+            throw new Error('messageId and reaction are required');
+          }
+          const result = await messageTools.reactToNote(args.messageId, args.reaction);
           return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
         }
 
