@@ -82,6 +82,8 @@ const server = createGrooveServer({ token: 'your_token_here', readOnly: true });
 
 `allowSend`, `allowSendAs`, `allowMerge`, `allowPermanentDelete`, and `apiUrl` are optional too. Sending, acting as a colleague, and permanent deletion stay off unless you set them to `true`, merging stays on unless you set `allowMerge: false`, and `readOnly` always wins.
 
+The library doesn't read the `GROOVE_` settings, so pass each option yourself. It also has no login, so a hosted server has two options: keep one token on the server and put your own authentication in front of it, or have each user send their own Groove API key and pass that to `createGrooveServer`.
+
 ## Handle with care
 
 This server can send real email to real customers. A few things keep that honest:
@@ -97,7 +99,7 @@ This server can send real email to real customers. A few things keep that honest
 
 Sending a draft from Groove may close the ticket, depending on your Groove settings.
 
-Your MCP client will usually ask before a tool runs. For sending mail, it's a good idea to keep it that way.
+Your MCP client will usually ask before a tool runs. Every tool is labeled as read, additive, or destructive, so clients like claude.ai can set approval per group. Tools that send mail count as destructive, and it's a good idea to keep asking for those.
 
 ## Good to know
 
@@ -121,6 +123,7 @@ npm run build
 
 npm run dev        # rebuild on change
 npm run typecheck  # check types
+npm test           # check the tool labels
 ```
 
 The code is small and easy to find your way around: tools live in `src/tools/`, and all the GraphQL lives in `src/utils/graphql-queries.ts`.

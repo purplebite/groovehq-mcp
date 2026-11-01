@@ -48,6 +48,11 @@ const ATTACHMENTS_SCHEMA = {
   },
 };
 
+// claude.ai groups tools and sets approval by these. destructiveHint defaults to true, so always set it
+const READ_TOOL = { readOnlyHint: true };
+const ADDITIVE_TOOL = { readOnlyHint: false, destructiveHint: false };
+const DESTRUCTIVE_TOOL = { readOnlyHint: false, destructiveHint: true };
+
 const SEND_TOOLS = ['createConversation', 'sendMessage', 'forwardConversation', 'undoSend'];
 const MERGE_TOOLS = ['mergeConversations', 'mergeContacts'];
 const WRITE_TOOLS = [
@@ -103,7 +108,7 @@ export function createGrooveServer(opts: GrooveServerOptions): Server {
   const server = new Server(
     {
       name: 'groovehq-mcp',
-      version: '0.8.0',
+      version: '0.8.1',
     },
     {
       capabilities: {
@@ -118,6 +123,7 @@ export function createGrooveServer(opts: GrooveServerOptions): Server {
       tools: [
         {
           name: 'listConversations',
+          annotations: READ_TOOL,
           description: 'List conversations with optional filters. Returns one page; if pageInfo.hasNextPage is true, more results exist.',
           inputSchema: {
             type: 'object',
@@ -166,6 +172,7 @@ export function createGrooveServer(opts: GrooveServerOptions): Server {
         },
         {
           name: 'getConversation',
+          annotations: READ_TOOL,
           description: 'Get detailed information about a specific conversation',
           inputSchema: {
             type: 'object',
@@ -180,6 +187,7 @@ export function createGrooveServer(opts: GrooveServerOptions): Server {
         },
         {
           name: 'createConversation',
+          annotations: DESTRUCTIVE_TOOL,
           description: 'SENDS AN EMAIL IMMEDIATELY to the given address and creates a ticket. Use only when the user explicitly asks to send this message.',
           inputSchema: {
             type: 'object',
@@ -245,6 +253,7 @@ export function createGrooveServer(opts: GrooveServerOptions): Server {
         },
         {
           name: 'logConversation',
+          annotations: ADDITIVE_TOOL,
           description:
             "Groove's Log a Conversation: creates a ticket for a contact that starts with an internal note, for example to record a phone call. Never sends email.",
           inputSchema: {
@@ -300,6 +309,7 @@ export function createGrooveServer(opts: GrooveServerOptions): Server {
         },
         {
           name: 'updateConversation',
+          annotations: ADDITIVE_TOOL,
           description: 'Update a conversation (status, assignee, tags). Can also unassign and remove tags',
           inputSchema: {
             type: 'object',
@@ -380,9 +390,9 @@ export function createGrooveServer(opts: GrooveServerOptions): Server {
         },
         {
           name: 'deleteConversation',
+          annotations: DESTRUCTIVE_TOOL,
           description:
             `Delete a ticket. It can be restored with restoreConversation${allowPermanentDelete ? ', unless permanent is set' : ''}. Always confirm with the user first.`,
-          annotations: { destructiveHint: true },
           inputSchema: {
             type: 'object',
             properties: {
@@ -405,6 +415,7 @@ export function createGrooveServer(opts: GrooveServerOptions): Server {
         },
         {
           name: 'restoreConversation',
+          annotations: ADDITIVE_TOOL,
           description: 'Restore a ticket from spam, trash or deleted',
           inputSchema: {
             type: 'object',
@@ -425,6 +436,7 @@ export function createGrooveServer(opts: GrooveServerOptions): Server {
         },
         {
           name: 'forwardConversation',
+          annotations: DESTRUCTIVE_TOOL,
           description:
             'SENDS AN EMAIL IMMEDIATELY: forwards a ticket to the given addresses. The ticket keeps its state, and only gets a new subject if you pass one. Use only when the user explicitly asks.',
           inputSchema: {
@@ -464,6 +476,7 @@ export function createGrooveServer(opts: GrooveServerOptions): Server {
         },
         {
           name: 'undoSend',
+          annotations: DESTRUCTIVE_TOOL,
           description: 'Cancel a mail just sent with sendMessage or forwardConversation. Only works right after sending, while Groove has not sent it yet.',
           inputSchema: {
             type: 'object',
@@ -482,6 +495,7 @@ export function createGrooveServer(opts: GrooveServerOptions): Server {
         },
         {
           name: 'editNote',
+          annotations: DESTRUCTIVE_TOOL,
           description: 'Change the text of an internal note. Use listMessages to find its ID.',
           inputSchema: {
             type: 'object',
@@ -500,6 +514,7 @@ export function createGrooveServer(opts: GrooveServerOptions): Server {
         },
         {
           name: 'reactToNote',
+          annotations: ADDITIVE_TOOL,
           description: 'Add a reaction to an internal note, or remove it if this agent already gave that reaction. Groove does not show reactions through the API.',
           inputSchema: {
             type: 'object',
@@ -518,8 +533,8 @@ export function createGrooveServer(opts: GrooveServerOptions): Server {
         },
         {
           name: 'deleteNote',
+          annotations: DESTRUCTIVE_TOOL,
           description: 'Delete an internal note. Confirm with the user first.',
-          annotations: { destructiveHint: true },
           inputSchema: {
             type: 'object',
             properties: {
@@ -533,11 +548,11 @@ export function createGrooveServer(opts: GrooveServerOptions): Server {
         },
         {
           name: 'mergeConversations',
+          annotations: DESTRUCTIVE_TOOL,
           description:
             'Permanently merge one ticket into another. This cannot be undone, so always confirm with the user first. ' +
             'The source ticket disappears. The target keeps its contact, subject and assignee. Replies and notes move over and tags are combined. ' +
             'Drafts on the source are deleted, and an open source reopens the target',
-          annotations: { destructiveHint: true },
           inputSchema: {
             type: 'object',
             properties: {
@@ -563,6 +578,7 @@ export function createGrooveServer(opts: GrooveServerOptions): Server {
         },
         {
           name: 'closeConversation',
+          annotations: ADDITIVE_TOOL,
           description: 'Close a conversation',
           inputSchema: {
             type: 'object',
@@ -577,6 +593,7 @@ export function createGrooveServer(opts: GrooveServerOptions): Server {
         },
         {
           name: 'listMessages',
+          annotations: READ_TOOL,
           description: 'List messages and notes in a conversation, oldest first. Groove can still return notes that were deleted, and mail that was moved to another ticket',
           inputSchema: {
             type: 'object',
@@ -595,6 +612,7 @@ export function createGrooveServer(opts: GrooveServerOptions): Server {
         },
         {
           name: 'sendMessage',
+          annotations: DESTRUCTIVE_TOOL,
           description: 'SENDS AN EMAIL IMMEDIATELY as a reply on a ticket. Use only when the user explicitly asks to send this message; to prepare a reply for review, use createReplyDraft.',
           inputSchema: {
             type: 'object',
@@ -629,6 +647,7 @@ export function createGrooveServer(opts: GrooveServerOptions): Server {
         },
         {
           name: 'createNote',
+          annotations: ADDITIVE_TOOL,
           description: 'Create an internal note in a conversation',
           inputSchema: {
             type: 'object',
@@ -649,6 +668,7 @@ export function createGrooveServer(opts: GrooveServerOptions): Server {
         },
         {
           name: 'listDrafts',
+          annotations: READ_TOOL,
           description: 'List your own unsent drafts, optionally for one ticket. Read-only. Drafts of other agents are not visible through the API.',
           inputSchema: {
             type: 'object',
@@ -662,6 +682,7 @@ export function createGrooveServer(opts: GrooveServerOptions): Server {
         },
         {
           name: 'createReplyDraft',
+          annotations: ADDITIVE_TOOL,
           description: 'Save a reply or note on a ticket as a draft for a person to review. NEVER SENDS anything. Drafts always belong to an existing ticket and are visible only to the agent who owns the API token.',
           inputSchema: {
             type: 'object',
@@ -703,6 +724,7 @@ export function createGrooveServer(opts: GrooveServerOptions): Server {
         },
         {
           name: 'deleteDraft',
+          annotations: DESTRUCTIVE_TOOL,
           description: 'Delete one of your own drafts from a ticket',
           inputSchema: {
             type: 'object',
@@ -721,6 +743,7 @@ export function createGrooveServer(opts: GrooveServerOptions): Server {
         },
         {
           name: 'listContacts',
+          annotations: READ_TOOL,
           description: 'List contacts with optional search, with their ticket counts. Returns one page; if pageInfo.hasNextPage is true, more results exist.',
           inputSchema: {
             type: 'object',
@@ -772,6 +795,7 @@ export function createGrooveServer(opts: GrooveServerOptions): Server {
         },
         {
           name: 'listCompanies',
+          annotations: READ_TOOL,
           description: 'List companies with optional search. Returns one page; if pageInfo.hasNextPage is true, more results exist.',
           inputSchema: {
             type: 'object',
@@ -810,6 +834,7 @@ export function createGrooveServer(opts: GrooveServerOptions): Server {
         },
         {
           name: 'updateCompany',
+          annotations: DESTRUCTIVE_TOOL,
           description: "Change a company's name or its extra domains. Groove often creates companies from mail domains, with no name or just the domain",
           inputSchema: {
             type: 'object',
@@ -838,10 +863,10 @@ export function createGrooveServer(opts: GrooveServerOptions): Server {
         },
         {
           name: 'mergeContacts',
+          annotations: DESTRUCTIVE_TOOL,
           description:
             'Permanently merge one contact into another, for example a typo address into the right one. This cannot be undone, so always confirm with the user first. ' +
             'The source contact and its address disappear. Its tickets move to the target, and its mail then shows the target as sender',
-          annotations: { destructiveHint: true },
           inputSchema: {
             type: 'object',
             properties: {
@@ -859,11 +884,11 @@ export function createGrooveServer(opts: GrooveServerOptions): Server {
         },
         {
           name: 'deleteContact',
+          annotations: DESTRUCTIVE_TOOL,
           description:
             'Permanently delete one contact by exact email address, which also removes it from recipient suggestions. A contact with tickets cannot be deleted: use mergeContacts. ' +
             'Without confirm it only shows what would be deleted. Always show that to the user first. ' +
             'Mail this contact wrote in a merged ticket loses its sender',
-          annotations: { destructiveHint: true },
           inputSchema: {
             type: 'object',
             properties: {
@@ -882,11 +907,11 @@ export function createGrooveServer(opts: GrooveServerOptions): Server {
         },
         {
           name: 'deleteContacts',
+          annotations: DESTRUCTIVE_TOOL,
           description:
             'Permanently delete up to 100 contacts by ID, one by one. A contact with tickets is skipped. ' +
             'Without confirm it only shows what would be deleted. Always show that to the user first. ' +
             'Mail these contacts wrote in merged tickets loses its sender',
-          annotations: { destructiveHint: true },
           inputSchema: {
             type: 'object',
             properties: {
@@ -906,6 +931,7 @@ export function createGrooveServer(opts: GrooveServerOptions): Server {
         },
         {
           name: 'getContact',
+          annotations: READ_TOOL,
           description: 'Get detailed information about a specific contact',
           inputSchema: {
             type: 'object',
@@ -920,6 +946,7 @@ export function createGrooveServer(opts: GrooveServerOptions): Server {
         },
         {
           name: 'createContact',
+          annotations: ADDITIVE_TOOL,
           description: 'Create a new contact',
           inputSchema: {
             type: 'object',
@@ -950,6 +977,7 @@ export function createGrooveServer(opts: GrooveServerOptions): Server {
         },
         {
           name: 'updateContact',
+          annotations: DESTRUCTIVE_TOOL,
           description: 'Update contact information, companies and extra email addresses',
           inputSchema: {
             type: 'object',
@@ -1004,6 +1032,7 @@ export function createGrooveServer(opts: GrooveServerOptions): Server {
         },
         {
           name: 'listAgents',
+          annotations: READ_TOOL,
           description: 'List all agents in the organization',
           inputSchema: {
             type: 'object',
@@ -1012,6 +1041,7 @@ export function createGrooveServer(opts: GrooveServerOptions): Server {
         },
         {
           name: 'getAgent',
+          annotations: READ_TOOL,
           description: 'Get detailed information about a specific agent',
           inputSchema: {
             type: 'object',
@@ -1026,6 +1056,7 @@ export function createGrooveServer(opts: GrooveServerOptions): Server {
         },
         {
           name: 'searchKbArticles',
+          annotations: READ_TOOL,
           description: 'Search knowledge base articles',
           inputSchema: {
             type: 'object',
@@ -1045,6 +1076,7 @@ export function createGrooveServer(opts: GrooveServerOptions): Server {
         },
         {
           name: 'listTags',
+          annotations: READ_TOOL,
           description: 'List all tags, for filtering or tagging tickets',
           inputSchema: {
             type: 'object',
@@ -1058,6 +1090,7 @@ export function createGrooveServer(opts: GrooveServerOptions): Server {
         },
         {
           name: 'listTeams',
+          annotations: READ_TOOL,
           description: 'List all teams, for filtering or assigning tickets',
           inputSchema: {
             type: 'object',
@@ -1066,6 +1099,7 @@ export function createGrooveServer(opts: GrooveServerOptions): Server {
         },
         {
           name: 'listChannels',
+          annotations: READ_TOOL,
           description: 'List all available channels/inboxes',
           inputSchema: {
             type: 'object',
@@ -1080,6 +1114,7 @@ export function createGrooveServer(opts: GrooveServerOptions): Server {
         },
         {
           name: 'getChannel',
+          annotations: READ_TOOL,
           description: 'Get detailed information about a specific channel',
           inputSchema: {
             type: 'object',
