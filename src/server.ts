@@ -23,6 +23,7 @@ export interface GrooveServerOptions {
   apiUrl?: string;
   readOnly?: boolean;
   allowSend?: boolean;
+  allowMerge?: boolean;
 }
 
 const SEND_TOOLS = ['createConversation', 'sendMessage'];
@@ -43,9 +44,11 @@ export function createGrooveServer(opts: GrooveServerOptions): Server {
 
   const readOnly = opts.readOnly === true;
   const allowSend = opts.allowSend === true && !readOnly;
+  const allowMerge = opts.allowMerge !== false && !readOnly;
 
   function isEnabled(tool: string): boolean {
     if (SEND_TOOLS.includes(tool)) return allowSend;
+    if (tool === 'mergeConversations') return allowMerge;
     if (WRITE_TOOLS.includes(tool)) return !readOnly;
     return true;
   }
@@ -64,7 +67,7 @@ export function createGrooveServer(opts: GrooveServerOptions): Server {
   const server = new Server(
     {
       name: 'groovehq-mcp',
-      version: '0.3.0',
+      version: '0.4.0',
     },
     {
       capabilities: {
@@ -184,7 +187,7 @@ export function createGrooveServer(opts: GrooveServerOptions): Server {
         },
         {
           name: 'updateConversation',
-          description: 'Update a conversation (status, assignee, tags)',
+          description: 'Update a conversation (status, assignee, tags). Can also unassign and remove tags',
           inputSchema: {
             type: 'object',
             properties: {
@@ -205,10 +208,28 @@ export function createGrooveServer(opts: GrooveServerOptions): Server {
                 type: 'string',
                 description: 'ID of team to assign the conversation to',
               },
+              unassign: {
+                type: 'boolean',
+                description:
+                  'Unassign the ticket: removes both the agent and the team. Use this unless asked to keep one of them. Add assignedAgentId or assignedTeamId to hand the ticket to someone else',
+              },
+              unassignAgent: {
+                type: 'boolean',
+                description: 'Remove only the agent. The team stays',
+              },
+              unassignTeam: {
+                type: 'boolean',
+                description: 'Remove only the team. The agent stays',
+              },
               tagIds: {
                 type: 'array',
                 items: { type: 'string' },
                 description: 'Tag IDs to add to the conversation (existing tags are kept)',
+              },
+              removeTagIds: {
+                type: 'array',
+                items: { type: 'string' },
+                description: 'Tag IDs to remove from the conversation (other tags are kept)',
               },
               snoozedUntil: {
                 type: 'string',
@@ -216,6 +237,36 @@ export function createGrooveServer(opts: GrooveServerOptions): Server {
               },
             },
             required: ['id'],
+          },
+        },
+        {
+          name: 'mergeConversations',
+          description:
+            'Permanently merge one ticket into another. This cannot be undone, so always confirm with the user first. ' +
+            'The source ticket disappears. The target keeps its contact, subject and assignee. Replies and notes move over and tags are combined. ' +
+            'Drafts on the source are deleted, and an open source reopens the target',
+          annotations: { destructiveHint: true },
+          inputSchema: {
+            type: 'object',
+            properties: {
+              sourceId: {
+                type: 'string',
+                description: 'Ticket that disappears: number (e.g. 12345) or conversation ID',
+              },
+              targetId: {
+                type: 'string',
+                description: 'Ticket that stays: number (e.g. 12345) or conversation ID',
+              },
+              allowDifferentContacts: {
+                type: 'boolean',
+                description: 'Merge even though the tickets have different contacts. Only after the user agreed',
+              },
+              discardDrafts: {
+                type: 'boolean',
+                description: 'Merge even though the source has drafts, which get deleted. Only after the user agreed',
+              },
+            },
+            required: ['sourceId', 'targetId'],
           },
         },
         {
@@ -561,11 +612,12 @@ export function createGrooveServer(opts: GrooveServerOptions): Server {
 
     try {
       if (!isEnabled(name)) {
-        throw new Error(
-          readOnly
-            ? `${name} is disabled: GROOVE_READ_ONLY is on`
-            : `${name} is disabled: it sends email, which needs GROOVE_ALLOW_SEND=1`
-        );
+        const reason = readOnly
+          ? 'GROOVE_READ_ONLY is on'
+          : name === 'mergeConversations'
+            ? 'merging is turned off with GROOVE_ALLOW_MERGE=0'
+            : 'it sends email, which needs GROOVE_ALLOW_SEND=1';
+        throw new Error(`${name} is disabled: ${reason}`);
       }
 
       switch (name) {
@@ -624,6 +676,21 @@ export function createGrooveServer(opts: GrooveServerOptions): Server {
               {
                 type: 'text',
                 text: JSON.stringify(conversation, null, 2),
+              },
+            ],
+          };
+        }
+
+        case 'mergeConversations': {
+          if (!args || typeof args.sourceId !== 'string' || typeof args.targetId !== 'string') {
+            throw new Error('sourceId and targetId are required');
+          }
+          const result = await conversationTools.mergeConversations(args as any);
+          return {
+            content: [
+              {
+                type: 'text',
+                text: JSON.stringify(result, null, 2),
               },
             ],
           };

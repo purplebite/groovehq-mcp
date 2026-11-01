@@ -9,6 +9,12 @@
 //
 //   GROOVE_API_TOKEN=... GROOVE_TEST_TICKET=12345 \
 //     npm run test:live -- --drafts                   saves and deletes drafts, sends nothing
+//
+//   GROOVE_API_TOKEN=... GROOVE_TEST_TO=you@example.com GROOVE_TEST_CHANNEL=ch_123 \
+//     npm run test:live -- --merge                    sends 3 test mails, merges those tickets
+//
+//   GROOVE_API_TOKEN=... npm run test:live -- --update
+//                                                     changes a [TEST] ticket and puts it back
 
 import { spawn } from 'node:child_process';
 import { createInterface } from 'node:readline';
@@ -16,6 +22,9 @@ import { fileURLToPath } from 'node:url';
 
 const write = process.argv.includes('--write');
 const drafts = process.argv.includes('--drafts');
+const update = process.argv.includes('--update');
+const merge = process.argv.includes('--merge');
+const sends = write || merge;
 const { GROOVE_API_TOKEN, GROOVE_TEST_TO, GROOVE_TEST_CHANNEL, GROOVE_TEST_TICKET } = process.env;
 
 if (!GROOVE_API_TOKEN) {
@@ -23,8 +32,8 @@ if (!GROOVE_API_TOKEN) {
   process.exit(1);
 }
 
-if (write && (!GROOVE_TEST_TO || !GROOVE_TEST_CHANNEL)) {
-  console.error('--write needs GROOVE_TEST_TO and GROOVE_TEST_CHANNEL.');
+if (sends && (!GROOVE_TEST_TO || !GROOVE_TEST_CHANNEL)) {
+  console.error('--write and --merge need GROOVE_TEST_TO and GROOVE_TEST_CHANNEL.');
   process.exit(1);
 }
 
@@ -35,7 +44,7 @@ if (drafts && !GROOVE_TEST_TICKET) {
 
 const server = spawn('node', [fileURLToPath(new URL('../dist/index.js', import.meta.url))], {
   stdio: ['pipe', 'pipe', 'ignore'],
-  env: { ...process.env, GROOVE_ALLOW_SEND: write ? '1' : '0', GROOVE_READ_ONLY: '0' },
+  env: { ...process.env, GROOVE_ALLOW_SEND: sends ? '1' : '0', GROOVE_READ_ONLY: '0' },
 });
 const lines = createInterface({ input: server.stdout })[Symbol.asyncIterator]();
 let nextId = 1;
@@ -199,8 +208,8 @@ await test('sending tools are hidden without GROOVE_ALLOW_SEND', async () => {
   const { result } = await rpc('tools/list');
   const names = result.tools.map(tool => tool.name);
   const hidden = !names.includes('sendMessage') && !names.includes('createConversation');
-  expect(hidden === !write, 'wrong tool list');
-  if (!write) {
+  expect(hidden === !sends, 'wrong tool list');
+  if (!sends) {
     expect((await fails('sendMessage', { conversationId: '1', to: 'a@b.c', body: 'x' }))?.includes('GROOVE_ALLOW_SEND'), 'not refused');
   }
 });
@@ -248,6 +257,111 @@ if (drafts) {
     expect(after.counts.notes === before.counts.notes, 'a note appeared');
     expect(after.state === before.state, 'state changed');
     expect((await call('listDrafts', { conversationId: ticket })).length === start, 'drafts left behind');
+  });
+}
+
+if (update) {
+  console.log('\nUpdating a ticket');
+
+  // The server has no tool for these two, so they are asked of Groove directly
+  const response = await fetch(process.env.GROOVE_API_URL || 'https://api.groovehq.com/v2/graphql', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${GROOVE_API_TOKEN}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      query: '{ me { id } teams(first: 100) { nodes { id agents(first: 100) { nodes { id } } } } }',
+    }),
+  });
+  const { me, teams } = (await response.json()).data;
+
+  // A team without other people, so nobody gets a notification
+  const team = teams.nodes.find(row => row.agents.nodes.every(agent => agent.id === me.id));
+
+  // Tickets made by --write. Everything below changes the ticket, so only those qualify
+  const { conversations } = await call('listConversations', { keywords: 'groovehq-mcp live test' });
+  const testTicket = conversations.find(row => row.subject.startsWith('[TEST]'));
+  if (!testTicket) {
+    console.error('No [TEST] ticket found. Run --write once to create one.');
+    process.exit(1);
+  }
+  const id = String(testTicket.number);
+  if (testTicket.assigned) {
+    console.error(`Ticket ${id} is assigned, unassign it first.`);
+    process.exit(1);
+  }
+
+  const tag = testTicket.tags.nodes[0]?.id ?? (await call('listTags', {}))[0].id;
+  const hadTag = testTicket.tags.nodes.some(row => row.id === tag);
+  const tagged = ticket => ticket.tags.nodes.some(row => row.id === tag);
+  console.log(`  using ticket ${id}, ${team ? 'a team without other people' : 'no team, every team has other people'}`);
+
+  await test('updateConversation adds and removes a tag', async () => {
+    expect(tagged(await call('updateConversation', { id, tagIds: [tag] })), 'tag not added');
+    expect(!tagged(await call('updateConversation', { id, removeTagIds: [tag] })), 'tag not removed');
+  });
+
+  await test('removing a tag the ticket does not have changes nothing', async () => {
+    expect(!tagged(await call('updateConversation', { id, removeTagIds: [tag] })), 'tag came back');
+  });
+
+  await test('a tag cannot be added and removed at once', async () => {
+    expect(await fails('updateConversation', { id, tagIds: [tag], removeTagIds: [tag] }), 'conflict allowed');
+    expect(!tagged(await call('getConversation', { id })), 'tag changed');
+  });
+
+  await test('unassign removes an agent', async () => {
+    const assigned = await call('updateConversation', { id, assignedAgentId: me.id });
+    expect(assigned.assigned?.agent?.id === me.id, 'not assigned');
+    expect(!(await call('updateConversation', { id, unassign: true })).assigned, 'still assigned');
+  });
+
+  await test('unassign does nothing on an unassigned ticket', async () => {
+    expect(!(await call('updateConversation', { id, unassign: true })).assigned, 'assigned');
+  });
+
+  if (team) {
+    await test('unassign removes a team', async () => {
+      const assigned = await call('updateConversation', { id, assignedTeamId: team.id });
+      expect(assigned.assigned?.team?.id === team.id, 'not assigned');
+      expect(!(await call('updateConversation', { id, unassign: true })).assigned, 'still assigned');
+    });
+
+    await test('unassign removes an agent and a team together', async () => {
+      await call('updateConversation', { id, assignedAgentId: me.id, assignedTeamId: team.id });
+      const both = await call('getConversation', { id });
+      expect(both.assigned?.agent?.id === me.id && both.assigned?.team?.id === team.id, 'not both assigned');
+      expect(!(await call('updateConversation', { id, unassign: true })).assigned, 'still assigned');
+    });
+
+    await test('unassignAgent removes only the agent', async () => {
+      await call('updateConversation', { id, assignedAgentId: me.id, assignedTeamId: team.id });
+      const left = await call('updateConversation', { id, unassignAgent: true });
+      expect(!left.assigned?.agent && left.assigned?.team?.id === team.id, 'wrong assignee left');
+      await call('updateConversation', { id, unassign: true });
+    });
+
+    await test('unassignTeam removes only the team', async () => {
+      await call('updateConversation', { id, assignedAgentId: me.id, assignedTeamId: team.id });
+      const left = await call('updateConversation', { id, unassignTeam: true });
+      expect(left.assigned?.agent?.id === me.id && !left.assigned?.team, 'wrong assignee left');
+      await call('updateConversation', { id, unassign: true });
+    });
+
+    await test('unassign with a new assignee hands the ticket over', async () => {
+      await call('updateConversation', { id, assignedAgentId: me.id });
+      const moved = await call('updateConversation', { id, unassign: true, assignedTeamId: team.id });
+      expect(!moved.assigned?.agent && moved.assigned?.team?.id === team.id, 'not handed over');
+      await call('updateConversation', { id, unassign: true });
+    });
+  }
+
+  await test('ticket is back as it was', async () => {
+    if (hadTag) await call('updateConversation', { id, tagIds: [tag] });
+    const after = await call('getConversation', { id });
+    expect(after.state === testTicket.state, 'state changed');
+    expect(tagged(after) === hadTag, 'tag not restored');
+    expect(!after.assigned, 'assignee left behind');
+    expect(after.counts.messages === testTicket.counts.messages, 'a message appeared');
+    expect(after.counts.notes === testTicket.counts.notes, 'a note appeared');
   });
 }
 
@@ -305,6 +419,95 @@ if (write) {
         expect((await call('closeConversation', { id: number })).state === 'CLOSED', 'not closed');
       });
     }
+  }
+}
+
+if (merge) {
+  const { createInterface: prompt } = await import('node:readline/promises');
+  const input = prompt({ input: process.stdin, output: process.stdout });
+  const answer = await input.question(`\nSend 3 test mails around ${GROOVE_TEST_TO} and merge those tickets? Type yes: `);
+  input.close();
+
+  if (answer !== 'yes') {
+    console.log('Skipped the merge tests.');
+  } else {
+    console.log('\nMerging');
+    const [name, domain] = GROOVE_TEST_TO.split('@');
+    const create = (to, letter) =>
+      call('createConversation', {
+        channelId: GROOVE_TEST_CHANNEL,
+        to,
+        subject: `[TEST] groovehq-mcp merge test ${letter}`,
+        body: 'Automated groovehq-mcp merge test. Feel free to ignore.',
+      });
+
+    // Groove refuses to merge while a new mail is still waiting to go out
+    const mergeWhenSent = async args => {
+      for (let tries = 0; ; tries++) {
+        const message = await fails('mergeConversations', args);
+        if (!message) return;
+        if (!message.includes('waiting to be sent') || tries === 24) throw new Error(message);
+        await new Promise(resolve => setTimeout(resolve, 5000));
+      }
+    };
+
+    // A plus address is another contact in Groove, delivered to the same mailbox
+    const first = await create(GROOVE_TEST_TO, 'A');
+    const second = await create(GROOVE_TEST_TO, 'B');
+    const other = await create(`${name}+merge@${domain}`, 'C');
+    const [source, target, foreign] = [first, second, other].map(row => String(row.number));
+    console.log(`  using tickets ${source}, ${target} and ${foreign}`);
+
+    await test('mergeConversations is marked as destructive', async () => {
+      const { result } = await rpc('tools/list');
+      const tool = result.tools.find(row => row.name === 'mergeConversations');
+      expect(tool?.annotations?.destructiveHint === true, 'no destructive hint');
+    });
+
+    await test('a ticket cannot be merged into itself', async () => {
+      expect(await fails('mergeConversations', { sourceId: source, targetId: source }), 'merged into itself');
+    });
+
+    await test('different contacts are refused and nothing changes', async () => {
+      const message = await fails('mergeConversations', { sourceId: foreign, targetId: target });
+      expect(message?.includes('allowDifferentContacts'), 'not refused');
+      expect((await call('getConversation', { id: foreign })).state === other.state, 'source changed');
+    });
+
+    await test('a draft on the source is refused and kept', async () => {
+      const draft = await call('createReplyDraft', { conversationId: source, body: 'Merge test draft.' });
+      const message = await fails('mergeConversations', { sourceId: source, targetId: target });
+      expect(message?.includes('discardDrafts'), 'not refused');
+      expect((await call('listDrafts', { conversationId: source })).some(row => row.draftId === draft.draftId), 'draft gone');
+    });
+
+    await test('discardDrafts merges and deletes the draft', async () => {
+      await mergeWhenSent({ sourceId: source, targetId: target, discardDrafts: true });
+      expect((await call('getConversation', { id: target })).counts.messages === 2, 'messages not moved');
+      expect(!(await call('listDrafts', { conversationId: target })).length, 'draft moved');
+    });
+
+    await test('a merged ticket says where it went', async () => {
+      for (const id of [source, first.id]) {
+        const message = await fails('getConversation', { id });
+        expect(message?.includes(`merged into #${target}`), `got: ${message}`);
+      }
+    });
+
+    await test('allowDifferentContacts merges and keeps the target contact', async () => {
+      await mergeWhenSent({ sourceId: foreign, targetId: target, allowDifferentContacts: true });
+      const ticket = await call('getConversation', { id: target });
+      expect(ticket.contact.email === GROOVE_TEST_TO, 'wrong contact');
+      expect(ticket.counts.messages === 3, 'messages not moved');
+    });
+
+    await test('merged tickets keep every message', async () => {
+      expect((await call('listMessages', { conversationId: target })).length === 3, 'wrong message count');
+    });
+
+    await test('closeConversation closes the merged ticket', async () => {
+      expect((await call('closeConversation', { id: target })).state === 'CLOSED', 'not closed');
+    });
   }
 }
 

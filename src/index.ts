@@ -15,6 +15,7 @@ const server = createGrooveServer({
   apiUrl,
   readOnly: process.env.GROOVE_READ_ONLY === '1',
   allowSend: process.env.GROOVE_ALLOW_SEND === '1',
+  allowMerge: process.env.GROOVE_ALLOW_MERGE !== '0',
 });
 const grooveClient = new GrooveClient(apiToken, apiUrl);
 

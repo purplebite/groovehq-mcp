@@ -1,6 +1,7 @@
 import { GrooveClient } from '../groove-client.js';
 import { queries, mutations } from '../utils/graphql-queries.js';
 import { Conversation } from '../types/groove.js';
+import { DraftTools } from './drafts.js';
 
 interface ListConversationsArgs {
   state?: 'unread' | 'opened' | 'closed' | 'snoozed';
@@ -27,7 +28,11 @@ interface UpdateConversationArgs {
   state?: 'opened' | 'closed' | 'snoozed';
   assignedAgentId?: string;
   assignedTeamId?: string;
+  unassign?: boolean;
+  unassignAgent?: boolean;
+  unassignTeam?: boolean;
   tagIds?: string[];
+  removeTagIds?: string[];
   snoozedUntil?: string;
 }
 
@@ -42,8 +47,25 @@ interface CreateConversationArgs {
   tagIds?: string[];
 }
 
+interface MergeConversationsArgs {
+  sourceId: string;
+  targetId: string;
+  allowDifferentContacts?: boolean;
+  discardDrafts?: boolean;
+}
+
+interface MergeTicket {
+  id: string;
+  number: number;
+  contact: { id: string; email: string } | null;
+}
+
 export class ConversationTools {
-  constructor(private client: GrooveClient) {}
+  private drafts: DraftTools;
+
+  constructor(private client: GrooveClient) {
+    this.drafts = new DraftTools(client);
+  }
 
   async listConversations(args: ListConversationsArgs): Promise<ListConversationsResult> {
     const filter: any = {};
@@ -100,6 +122,10 @@ export class ConversationTools {
   }
 
   async updateConversation(args: UpdateConversationArgs): Promise<Conversation> {
+    if (args.removeTagIds?.some(tagId => args.tagIds?.includes(tagId))) {
+      throw new Error('A tag cannot be in both tagIds and removeTagIds');
+    }
+
     const conversationId = await this.client.resolveConversationId(args.id);
     const applied: string[] = [];
     let conversation: Conversation | undefined;
@@ -133,10 +159,26 @@ export class ConversationTools {
       });
     }
 
+    // Runs before assigning, so unassign plus a new assignee hands the ticket over
+    const unassignAgent = args.unassign || args.unassignAgent;
+    const unassignTeam = args.unassign || args.unassignTeam;
+    if (unassignAgent || unassignTeam) {
+      await apply('unassign', mutations.conversationUnassign, 'conversationUnassign', {
+        agent: unassignAgent,
+        team: unassignTeam,
+      });
+    }
+
     if (args.assignedAgentId || args.assignedTeamId) {
       await apply('assignee', mutations.conversationAssign, 'conversationAssign', {
         agentId: args.assignedAgentId,
         teamId: args.assignedTeamId,
+      });
+    }
+
+    if (args.removeTagIds?.length) {
+      await apply('removed tags', mutations.conversationUntag, 'conversationUntag', {
+        tagIds: args.removeTagIds,
       });
     }
 
@@ -145,10 +187,60 @@ export class ConversationTools {
     }
 
     if (!conversation) {
-      throw new Error('Provide at least one of state, assignedAgentId, assignedTeamId or tagIds');
+      throw new Error(
+        'Provide at least one of state, assignedAgentId, assignedTeamId, unassign, unassignAgent, unassignTeam, tagIds or removeTagIds'
+      );
     }
 
     return conversation;
+  }
+
+  async mergeConversations(args: MergeConversationsArgs) {
+    const sourceId = await this.client.resolveConversationId(args.sourceId);
+    const targetId = await this.client.resolveConversationId(args.targetId);
+    if (sourceId === targetId) throw new Error('Cannot merge a ticket into itself');
+
+    const source = await this.mergeTicket(sourceId);
+    const target = await this.mergeTicket(targetId);
+
+    if (!args.allowDifferentContacts && source.contact?.id !== target.contact?.id) {
+      throw new Error(
+        `Ticket #${source.number} is from ${source.contact?.email} and #${target.number} from ${target.contact?.email}. ` +
+          `After a merge the conversation only shows under ${target.contact?.email}. ` +
+          'Ask the user, then pass allowDifferentContacts to go ahead.'
+      );
+    }
+
+    // Groove deletes the drafts on the source, and only the token owner's are visible here
+    const drafts = await this.drafts.listDrafts({ conversationId: sourceId });
+    if (drafts.length && !args.discardDrafts) {
+      throw new Error(
+        `Ticket #${source.number} has ${drafts.length} unsent draft(s), and a merge deletes them. ` +
+          'Ask the user, then pass discardDrafts to go ahead.'
+      );
+    }
+
+    const payload = await this.client.mutate<{ target: Conversation }>(
+      mutations.conversationMerge,
+      'conversationMerge',
+      { sourceId, targetId }
+    );
+
+    return {
+      merged: true,
+      mergedTicket: source.number,
+      discardedDrafts: drafts.length,
+      ticket: payload.target,
+    };
+  }
+
+  private async mergeTicket(id: string): Promise<MergeTicket> {
+    const response = await this.client.request<{ node: MergeTicket | null }>(
+      queries.getDraftTicket,
+      { id }
+    );
+    if (!response.node) throw new Error(`Ticket not found: ${id}`);
+    return response.node;
   }
 
   async closeConversation(id: string): Promise<Conversation> {

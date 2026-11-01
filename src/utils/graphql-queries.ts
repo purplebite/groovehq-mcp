@@ -243,6 +243,14 @@ export const queries = {
     }
   `,
 
+  getTicketNode: `
+    query GetTicketNode($id: ID!) {
+      node(id: $id) {
+        id
+      }
+    }
+  `,
+
   listEvents: `
     query ListEvents($filter: EventsFilterInput!, $first: Int, $after: String) {
       events(filter: $filter, first: $first, after: $after) {
@@ -479,10 +487,52 @@ export const mutations = {
     }
   `,
 
+  conversationUnassign: `
+    mutation ConversationUnassign($input: ConversationUnassignInput!) {
+      conversationUnassign(input: $input) {
+        conversation {
+          ${CONVERSATION_FIELDS}
+        }
+        errors {
+          message
+          path
+        }
+      }
+    }
+  `,
+
   conversationTag: `
     mutation ConversationTag($input: ConversationTagInput!) {
       conversationTag(input: $input) {
         conversation {
+          ${CONVERSATION_FIELDS}
+        }
+        errors {
+          message
+          path
+        }
+      }
+    }
+  `,
+
+  conversationUntag: `
+    mutation ConversationUntag($input: ConversationUntagInput!) {
+      conversationUntag(input: $input) {
+        conversation {
+          ${CONVERSATION_FIELDS}
+        }
+        errors {
+          message
+          path
+        }
+      }
+    }
+  `,
+
+  conversationMerge: `
+    mutation ConversationMerge($input: ConversationMergeInput!) {
+      conversationMerge(input: $input) {
+        target {
           ${CONVERSATION_FIELDS}
         }
         errors {

@@ -24,6 +24,10 @@ export class GrooveClient {
     } catch (error: any) {
       if (error.response?.errors) {
         const graphqlError = error.response.errors[0] as GraphQLError;
+        if (graphqlError.extensions?.code === 'RESOURCE_MERGED') {
+          const target = String(graphqlError.extensions.new_conversation_id).replace(/^cnv_/, '#');
+          throw new Error(`Ticket was merged into ${target}`);
+        }
         // Groove reports an ID that never existed as deleted too
         if (graphqlError.message.includes('object of type Conversation is deleted')) {
           throw new Error('Ticket not found or deleted');
@@ -44,6 +48,8 @@ export class GrooveClient {
     }>(queries.getConversationId, { number: Number(number) });
 
     if (!response.conversation) {
+      // Groove finds no merged ticket by number, but its ID says where it went
+      await this.request(queries.getTicketNode, { id: `cnv_${number}` });
       throw new Error(`Ticket not found: ${ticket}`);
     }
 
