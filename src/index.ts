@@ -25,7 +25,7 @@ async function main() {
   const isValid = await grooveClient.validateConnection();
   
   if (!isValid) {
-    console.error('Failed to connect to Groove API. Please check your API token.');
+    console.error('Failed to connect to Groove API. Please check your API token and URL.');
     process.exit(1);
   }
 

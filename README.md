@@ -100,7 +100,7 @@ Your MCP client will usually ask before a tool runs. For sending mail, it's a go
 
 ## Good to know
 
-- **Some of this API is undocumented.** Sending mail and adding notes are in the official docs. The read queries (`conversations` and `events`) aren't, but Groove's own web app uses them.
+- **The docs don't cover everything.** Everything here uses Groove's documented GraphQL API, but details like the draft format and what a merge keeps come from testing on a live account.
 - **Not tested with everything.** Our account only has email tickets and no knowledge base articles, so chat, widget, knowledge base search haven't been tried with real data.
 - **Drafts are personal.** They belong to the agent who owns the API token, and they only work on existing tickets.
 - **Merged messages don't get sorted.** Groove adds them to the end of the ticket with their original dates, while `listMessages` always sorts by date.
