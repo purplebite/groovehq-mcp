@@ -16,6 +16,9 @@
 //   GROOVE_API_TOKEN=... GROOVE_TEST_TO=you@example.com npm run test:live -- --contacts
 //                                                     only this: creates and deletes contacts, sends nothing
 //
+//   GROOVE_API_TOKEN=... GROOVE_TEST_TO=you@example.com GROOVE_TEST_CHANNEL=ch_123 \
+//     npm run test:live -- --tickets                  only this: sends 1 test mail, changes and deletes test tickets
+//
 //   GROOVE_API_TOKEN=... npm run test:live -- --update
 //                                                     changes a [TEST] ticket and puts it back
 
@@ -28,7 +31,8 @@ const drafts = process.argv.includes('--drafts');
 const update = process.argv.includes('--update');
 const merge = process.argv.includes('--merge');
 const contactsOnly = process.argv.includes('--contacts');
-const sends = write || merge;
+const ticketsOnly = process.argv.includes('--tickets');
+const sends = write || merge || ticketsOnly;
 const { GROOVE_API_TOKEN, GROOVE_TEST_TO, GROOVE_TEST_CHANNEL, GROOVE_TEST_TICKET } = process.env;
 
 if (!GROOVE_API_TOKEN) {
@@ -37,7 +41,7 @@ if (!GROOVE_API_TOKEN) {
 }
 
 if (sends && (!GROOVE_TEST_TO || !GROOVE_TEST_CHANNEL)) {
-  console.error('--write and --merge need GROOVE_TEST_TO and GROOVE_TEST_CHANNEL.');
+  console.error('--write, --merge and --tickets need GROOVE_TEST_TO and GROOVE_TEST_CHANNEL.');
   process.exit(1);
 }
 
@@ -53,7 +57,7 @@ if (contactsOnly && !GROOVE_TEST_TO) {
 
 const server = spawn('node', [fileURLToPath(new URL('../dist/index.js', import.meta.url))], {
   stdio: ['pipe', 'pipe', 'ignore'],
-  env: { ...process.env, GROOVE_ALLOW_SEND: sends ? '1' : '0', GROOVE_READ_ONLY: '0' },
+  env: { ...process.env, GROOVE_ALLOW_SEND: sends ? '1' : '0', GROOVE_ALLOW_PERMANENT_DELETE: ticketsOnly ? '1' : '0', GROOVE_READ_ONLY: '0' },
 });
 const lines = createInterface({ input: server.stdout })[Symbol.asyncIterator]();
 let nextId = 1;
@@ -109,6 +113,103 @@ await rpc('initialize', {
   clientInfo: { name: 'live-test', version: '1' },
 });
 server.stdin.write(JSON.stringify({ jsonrpc: '2.0', method: 'notifications/initialized' }) + '\n');
+
+if (ticketsOnly) {
+  console.log('\nTickets');
+  const { createInterface: prompt } = await import('node:readline/promises');
+  const input = prompt({ input: process.stdin, output: process.stdout });
+  const answer = await input.question(`\nSend a test mail to a plus address of ${GROOVE_TEST_TO}? Type yes: `);
+  input.close();
+  if (answer !== 'yes') {
+    console.log('Skipped the ticket tests.');
+    server.kill();
+    process.exit(0);
+  }
+
+  const [local, domain] = GROOVE_TEST_TO.split('@');
+  const stamp = Date.now();
+  const log = async name =>
+    (await call('logConversation', {
+      channelId: GROOVE_TEST_CHANNEL,
+      to: GROOVE_TEST_TO,
+      subject: `[TEST] groovehq-mcp ticket test ${name}`,
+      body: 'Automated groovehq-mcp ticket test.',
+      skipNotifications: true,
+    })).ticket;
+  const ticket = await log('A');
+  const id = String(ticket.number);
+  const read = () => call('getConversation', { id });
+  console.log(`  using ticket ${id}`);
+
+  await test('updateConversation changes the subject and stars', async () => {
+    const renamed = await call('updateConversation', { id, subject: `[TEST] renamed ${stamp}`, starred: true });
+    expect(renamed.subject === `[TEST] renamed ${stamp}` && renamed.starred, 'not changed');
+    expect(!(await call('updateConversation', { id, starred: false })).starred, 'still starred');
+  });
+
+  await test('updateConversation marks a ticket unread', async () => {
+    expect((await call('updateConversation', { id, state: 'unread' })).state === 'UNREAD', 'wrong state');
+  });
+
+  await test('updateConversation changes the contact and keeps the mail', async () => {
+    const other = await call('createContact', { email: `${local}+other${stamp}@${domain}`, firstName: 'Test' });
+    const moved = await call('updateConversation', { id, contactId: other.id });
+    expect(moved.contact.id === other.id, 'not moved');
+    const back = await call('updateConversation', { id, contactId: ticket.contact.id });
+    expect(back.contact.id === ticket.contact.id, 'not moved back');
+    await call('deleteContacts', { contactIds: [other.id], confirm: true });
+  });
+
+  await test('spam, trash and restore change the state', async () => {
+    expect((await call('updateConversation', { id, state: 'spam' })).state === 'SPAM', 'not spam');
+    expect((await call('restoreConversation', { id, state: 'opened' })).state === 'OPENED', 'not restored');
+    await call('updateConversation', { id, state: 'trashed' });
+    expect((await read()).state !== 'OPENED', 'not trashed');
+    expect((await call('restoreConversation', { id })).state === 'OPENED', 'not restored');
+  });
+
+  await test('editNote and deleteNote change a note', async () => {
+    await call('createNote', { conversationId: id, body: `Note ${stamp}` });
+    const note = (await call('listMessages', { conversationId: id })).find(row => row.bodyPlainText?.includes(`Note ${stamp}`));
+    await call('editNote', { messageId: note.id, body: `Edited ${stamp}` });
+    const edited = (await call('listMessages', { conversationId: id })).find(row => row.id === note.id);
+    expect(edited.bodyPlainText.includes(`Edited ${stamp}`), 'not edited');
+    expect((await call('deleteNote', { messageId: note.id })).deleted, 'not deleted');
+  });
+
+  await test('a mail can be undone right after sending', async () => {
+    const reply = await call('sendMessage', { conversationId: id, to: `${local}+undo@${domain}`, body: 'Automated undo test.' });
+    expect(reply.changesetId, 'no changesetId');
+    expect((await call('undoSend', { conversationId: id, changesetId: reply.changesetId })).undone, 'not undone');
+    await new Promise(resolve => setTimeout(resolve, 3000));
+    // Groove empties an undone mail instead of removing it, so the count stays the same
+    const messages = await call('listMessages', { conversationId: id });
+    expect(!messages.some(row => row.bodyPlainText?.includes('Automated undo test')), 'mail stayed on the ticket');
+  });
+
+  await test('forwardConversation keeps the ticket as it was', async () => {
+    const before = await read();
+    const forwarded = await call('forwardConversation', { conversationId: id, to: [`${local}+fwd@${domain}`], body: 'Automated forward test.' });
+    expect(forwarded.subject === before.subject && forwarded.state === before.state, 'ticket changed');
+  });
+
+  await test('deleteConversation can be restored unless permanent', async () => {
+    const other = await log('B');
+    const otherId = String(other.number);
+    expect((await call('deleteConversation', { id: otherId })).deleted, 'not deleted');
+    expect((await call('restoreConversation', { id: otherId })).state === 'OPENED', 'not restored');
+    expect((await call('deleteConversation', { id: otherId, permanent: true })).permanent, 'not permanent');
+    expect(await fails('getConversation', { id: otherId }), 'still there');
+  });
+
+  await test('closeConversation closes the test ticket', async () => {
+    expect((await call('closeConversation', { id })).state === 'CLOSED', 'not closed');
+  });
+
+  server.kill();
+  console.log(`\n${passed} passed, ${failed} failed`);
+  process.exit(failed ? 1 : 0);
+}
 
 if (contactsOnly) {
   console.log('\nContacts');
@@ -189,6 +290,81 @@ if (contactsOnly) {
     expect(result.merged && result.contact.id === target.id, 'wrong result');
     expect((await settles(source.email, false)) && (await exists(target.email)), 'wrong contact left');
     await call('deleteContact', { email: target.email, confirm: true });
+  });
+
+  await test('updateContact removes and adds a company', async () => {
+    const contact = await create('e');
+    try {
+      const company = owner.companies?.nodes[0];
+      expect(company, 'GROOVE_TEST_TO has no company');
+      const has = row => row.companies?.nodes.some(item => item.id === company.id);
+      expect(!has(await call('updateContact', { id: contact.id, removeCompanyIds: [company.id] })), 'not removed');
+      expect(has(await call('updateContact', { id: contact.id, companyIds: [company.id] })), 'not added');
+      expect(await fails('updateContact', { id: contact.id, companyIds: [company.id], removeCompanyIds: [company.id] }), 'conflict allowed');
+    } finally {
+      await call('deleteContact', { email: contact.email, confirm: true });
+    }
+  });
+
+  await test('updateContact adds and removes secondary emails', async () => {
+    const contact = await create('f');
+    const [one, two] = [address('g'), address('h')];
+    try {
+      await call('updateContact', { id: contact.id, addSecondaryEmails: [one, two] });
+      let row = await call('getContact', { id: contact.id });
+      expect(row.secondaryEmails.length === 2 && row.email === contact.email, 'not added');
+      expect(await fails('updateContact', { id: contact.id, addSecondaryEmails: [`${one},${two}`] }), 'bad address accepted');
+      expect(await fails('updateContact', { id: contact.id, removeSecondaryEmails: [address('nobody')] }), 'unknown address accepted');
+      row = await call('updateContact', { id: contact.id, removeSecondaryEmails: [one] });
+      expect(row.secondaryEmails.length === 1 && row.secondaryEmails[0] === two, `wrong list: ${row.secondaryEmails}`);
+      expect(row.email === contact.email, 'main address changed');
+      const lookup = await call('deleteContact', { email: two });
+      expect(lookup.found === false, 'matched a secondary address');
+    } finally {
+      await call('deleteContact', { email: contact.email, confirm: true });
+    }
+  });
+
+  await test('updateCompany changes the name and extra domains', async () => {
+    const graphql = async (query, input) => {
+      const response = await fetch(process.env.GROOVE_API_URL || 'https://api.groovehq.com/v2/graphql', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${GROOVE_API_TOKEN}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query, variables: { input } }),
+      });
+      return (await response.json()).data;
+    };
+    const { companyCreate } = await graphql(
+      'mutation($input: CompanyCreateInput!) { companyCreate(input: $input) { company { id } } }',
+      { customFields: [{ customFieldIdOrKey: 'company_name', value: `[TEST] groovehq-mcp ${stamp}` }] }
+    );
+    const id = companyCreate.company.id;
+    try {
+      const renamed = await call('updateCompany', { id, name: `[TEST] renamed ${stamp}` });
+      expect(renamed.name === `[TEST] renamed ${stamp}`, 'not renamed');
+      const [one, two] = [`one${stamp}.example`, `two${stamp}.example`];
+      const added = await call('updateCompany', { id, addDomains: [one, two] });
+      expect(added.domains.length === 2, 'domains not added');
+      expect(await fails('updateCompany', { id, addDomains: ['not a domain'] }), 'bad domain accepted');
+      const left = await call('updateCompany', { id, removeDomains: [one] });
+      expect(left.domains.length === 1 && left.domains[0] === two, `wrong list: ${left.domains}`);
+    } finally {
+      await graphql('mutation($input: CompanyDeleteInput!) { companyDelete(input: $input) { errors { message } } }', { companyId: id });
+    }
+  });
+
+  await test('listCompanies pages without overlap', async () => {
+    const first = await call('listCompanies', { limit: 5 });
+    const second = await call('listCompanies', { limit: 5, after: first.pageInfo.endCursor });
+    expect(first.companies.length === 5, 'wrong page size');
+    expect(!ids(second.companies).some(id => ids(first.companies).includes(id)), 'pages overlap');
+  });
+
+  await test('listCompanies sorts by ticket count', async () => {
+    const { companies } = await call('listCompanies', { limit: 20, orderBy: { field: 'CONVERSATION_COUNT', direction: 'DESC' } });
+    // Groove's sort on counts is only rough, so this compares the two ends
+    const counts = companies.map(row => row.conversationCount);
+    expect(counts[0] > counts[counts.length - 1], `not sorted: ${counts}`);
   });
 
   server.kill();
@@ -471,6 +647,26 @@ if (write) {
   } else {
     console.log('\nWriting');
     let number;
+    const [local, domain] = GROOVE_TEST_TO.split('@');
+    const cc = `${local}+cc@${domain}`;
+    const bcc = `${local}+bcc@${domain}`;
+
+    // No tool shows the recipients of a sent mail, so this asks Groove directly
+    const copies = async () => {
+      const response = await fetch(process.env.GROOVE_API_URL || 'https://api.groovehq.com/v2/graphql', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${GROOVE_API_TOKEN}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          query: `query($id: ID!) { events(filter: { conversationId: $id }, first: 20) { nodes { change { ... on Reply {
+            cc { nodes { ... on Contact { email } } } bcc { nodes { ... on Contact { email } } } } } } } }`,
+          variables: { id: `cnv_${number}` },
+        }),
+      });
+      const { data } = await response.json();
+      return data.events.nodes.map(row => row.change).filter(change => change?.cc);
+    };
+    const hasCopies = mail =>
+      mail.cc.nodes.some(row => row.email === cc) && mail.bcc.nodes.some(row => row.email === bcc);
 
     await test('createConversation sends a mail', async () => {
       const created = await call('createConversation', {
@@ -478,10 +674,38 @@ if (write) {
         to: GROOVE_TEST_TO,
         subject: '[TEST] groovehq-mcp live test',
         body: 'Automated groovehq-mcp test. Feel free to ignore.',
+        cc: [cc],
+        bcc: [bcc],
       });
       expect(created.contact.email === GROOVE_TEST_TO, 'wrong contact');
       number = `${created.number}`;
       return `ticket ${number}`;
+    });
+
+    await test('logConversation starts a ticket with a note and sends nothing', async () => {
+      const whoAmI = await fetch(process.env.GROOVE_API_URL || 'https://api.groovehq.com/v2/graphql', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${GROOVE_API_TOKEN}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query: '{ me { id } }' }),
+      });
+      const agent = (await whoAmI.json()).data.me;
+      const result = await call('logConversation', {
+        channelId: GROOVE_TEST_CHANNEL,
+        to: `${local}+log@${domain}`,
+        toName: 'Log Test',
+        subject: '[TEST] groovehq-mcp log test',
+        body: 'Automated groovehq-mcp log test.',
+        state: 'closed',
+        skipNotifications: true,
+        assignedAgentId: agent.id,
+      });
+      expect(result.logged && result.sent === false, 'wrong result');
+      expect(result.ticket.assigned?.agent?.id === agent.id, 'not assigned');
+      expect(result.ticket.counts.notes === 1 && result.ticket.counts.messages === 0, 'not a note');
+      expect(result.ticket.state === 'CLOSED', 'wrong state');
+      expect(result.ticket.contact.email === `${local}+log@${domain}`, 'wrong contact');
+      expect(await fails('logConversation', { channelId: 'ch_0', to: 'a@b.c', subject: 'x', body: 'x' }), 'wrong channel accepted');
+      return `ticket ${result.ticket.number}`;
     });
 
     if (number) {
@@ -490,8 +714,15 @@ if (write) {
           conversationId: number,
           to: GROOVE_TEST_TO,
           body: 'Automated groovehq-mcp test reply.',
+          cc: [cc],
+          bcc: [bcc],
         });
         expect(reply.counts.messages === 2, 'reply not counted');
+      });
+
+      await test('createConversation and sendMessage send cc and bcc', async () => {
+        const mails = await copies();
+        expect(mails.length === 2 && mails.every(hasCopies), 'copies missing');
       });
 
       await test('createNote adds a note', async () => {

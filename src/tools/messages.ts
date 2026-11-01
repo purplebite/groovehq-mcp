@@ -11,6 +11,8 @@ interface SendMessageArgs {
   conversationId: string;
   to: string;
   body: string;
+  cc?: string[];
+  bcc?: string[];
 }
 
 interface CreateNoteArgs {
@@ -37,7 +39,12 @@ export class MessageTools {
             endCursor: string;
           };
         };
-      }>(queries.listEvents, { filter: { conversationId }, first: 50, after });
+      }>(queries.listEvents, {
+        // Without this filter, one broken history item fails the whole list
+        filter: { conversationId, eventType: ['MESSAGE_CREATED'] },
+        first: 50,
+        after,
+      });
 
       for (const event of response.events.nodes) {
         if (event.change?.id) messages.push(event.change as Message);
@@ -52,18 +59,46 @@ export class MessageTools {
     return args.limit ? messages.slice(-args.limit) : messages;
   }
 
-  async sendMessage(args: SendMessageArgs): Promise<Conversation> {
-    const payload = await this.client.mutate<{ conversation: Conversation }>(
+  async sendMessage(args: SendMessageArgs) {
+    const payload = await this.client.mutate<{ conversation: Conversation; changesetId: string }>(
       mutations.conversationReply,
       'conversationReply',
       {
         conversationId: await this.client.resolveConversationId(args.conversationId),
         to: args.to,
         body: args.body,
+        cc: args.cc,
+        bcc: args.bcc,
       }
     );
 
-    return payload.conversation;
+    return { ...payload.conversation, changesetId: payload.changesetId };
+  }
+
+  async undoSend(conversationId: string, changesetId: string) {
+    await this.client.mutate(mutations.conversationUndoSend, 'conversationUndoSend', {
+      conversationId: await this.client.resolveConversationId(conversationId),
+      changesetId,
+    });
+
+    return { undone: true, changesetId };
+  }
+
+  async editNote(messageId: string, body: string) {
+    await this.client.mutate(mutations.conversationEditNote, 'conversationEditNote', {
+      messageId,
+      body,
+    });
+
+    return { edited: true, messageId };
+  }
+
+  async deleteNote(messageId: string) {
+    await this.client.mutate(mutations.conversationDeleteNote, 'conversationDeleteNote', {
+      messageId,
+    });
+
+    return { deleted: true, messageId };
   }
 
   async createNote(args: CreateNoteArgs): Promise<Conversation> {

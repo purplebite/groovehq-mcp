@@ -25,16 +25,23 @@ export interface GrooveServerOptions {
   allowSend?: boolean;
   allowMerge?: boolean;
   allowContactDelete?: boolean;
+  allowPermanentDelete?: boolean;
 }
 
-const SEND_TOOLS = ['createConversation', 'sendMessage'];
+const SEND_TOOLS = ['createConversation', 'sendMessage', 'forwardConversation', 'undoSend'];
 const MERGE_TOOLS = ['mergeConversations', 'mergeContacts'];
 const CONTACT_DELETE_TOOLS = ['deleteContact', 'deleteContacts'];
 const WRITE_TOOLS = [
+  'logConversation',
+  'deleteConversation',
+  'restoreConversation',
+  'editNote',
+  'deleteNote',
   'updateConversation',
   'closeConversation',
   'createNote',
   'createContact',
+  'updateCompany',
   'updateContact',
   'createReplyDraft',
   'deleteDraft',
@@ -49,6 +56,7 @@ export function createGrooveServer(opts: GrooveServerOptions): Server {
   const allowSend = opts.allowSend === true && !readOnly;
   const allowMerge = opts.allowMerge !== false && !readOnly;
   const allowContactDelete = opts.allowContactDelete !== false && !readOnly;
+  const allowPermanentDelete = opts.allowPermanentDelete === true && !readOnly;
 
   function isEnabled(tool: string): boolean {
     if (SEND_TOOLS.includes(tool)) return allowSend;
@@ -72,7 +80,7 @@ export function createGrooveServer(opts: GrooveServerOptions): Server {
   const server = new Server(
     {
       name: 'groovehq-mcp',
-      version: '0.5.0',
+      version: '0.6.0',
     },
     {
       capabilities: {
@@ -186,6 +194,69 @@ export function createGrooveServer(opts: GrooveServerOptions): Server {
                 items: { type: 'string' },
                 description: 'Tag IDs to apply to the conversation',
               },
+              cc: {
+                type: 'array',
+                items: { type: 'string' },
+                description: 'Email addresses to send a copy to',
+              },
+              bcc: {
+                type: 'array',
+                items: { type: 'string' },
+                description: 'Email addresses to send a hidden copy to',
+              },
+            },
+            required: ['channelId', 'to', 'subject', 'body'],
+          },
+        },
+        {
+          name: 'logConversation',
+          description:
+            "Groove's Log a Conversation: creates a ticket for a contact that starts with an internal note, for example to record a phone call. Never sends email.",
+          inputSchema: {
+            type: 'object',
+            properties: {
+              channelId: {
+                type: 'string',
+                description: 'ID of the email channel for the ticket',
+              },
+              to: {
+                type: 'string',
+                description: 'Email address of the contact. A new contact is created if needed',
+              },
+              toName: {
+                type: 'string',
+                description: 'Name of the contact (defaults to the email address)',
+              },
+              phone: {
+                type: 'string',
+                description: 'Phone number of the contact, for example when logging a call',
+              },
+              subject: {
+                type: 'string',
+                description: 'Subject of the ticket',
+              },
+              body: {
+                type: 'string',
+                description: 'Text of the internal note',
+              },
+              state: {
+                type: 'string',
+                enum: ['opened', 'closed'],
+                description: 'State of the new ticket',
+                default: 'opened',
+              },
+              assignedAgentId: {
+                type: 'string',
+                description: 'ID of agent to assign the ticket to',
+              },
+              assignedTeamId: {
+                type: 'string',
+                description: 'ID of team to assign the ticket to',
+              },
+              skipNotifications: {
+                type: 'boolean',
+                description: 'Do not notify agents about the new ticket',
+              },
             },
             required: ['channelId', 'to', 'subject', 'body'],
           },
@@ -202,8 +273,34 @@ export function createGrooveServer(opts: GrooveServerOptions): Server {
               },
               state: {
                 type: 'string',
-                enum: ['opened', 'closed', 'snoozed'],
+                enum: ['opened', 'closed', 'snoozed', 'unread', 'spam', 'trashed'],
                 description: 'New conversation state',
+              },
+              subject: {
+                type: 'string',
+                description: 'New subject',
+              },
+              contactId: {
+                type: 'string',
+                description: 'Move the ticket to this contact. The sender of existing mail stays the same',
+              },
+              channelId: {
+                type: 'string',
+                description: 'Move the ticket to this mailbox. Refused if this account has no access to it',
+              },
+              starred: {
+                type: 'boolean',
+                description: 'Star or unstar the ticket',
+              },
+              followerIds: {
+                type: 'array',
+                items: { type: 'string' },
+                description: 'Agent IDs to add as followers',
+              },
+              removeFollowerIds: {
+                type: 'array',
+                items: { type: 'string' },
+                description: 'Agent IDs to remove as followers',
               },
               assignedAgentId: {
                 type: 'string',
@@ -242,6 +339,140 @@ export function createGrooveServer(opts: GrooveServerOptions): Server {
               },
             },
             required: ['id'],
+          },
+        },
+        {
+          name: 'deleteConversation',
+          description:
+            `Delete a ticket. It can be restored with restoreConversation${allowPermanentDelete ? ', unless permanent is set' : ''}. Always confirm with the user first.`,
+          annotations: { destructiveHint: true },
+          inputSchema: {
+            type: 'object',
+            properties: {
+              id: {
+                type: 'string',
+                description: 'Ticket number (e.g. 12345) or conversation ID',
+              },
+              ...(allowPermanentDelete
+                ? {
+                    permanent: {
+                      type: 'boolean',
+                      description: 'Delete it for good. This cannot be undone. Only after the user agreed',
+                      default: false,
+                    },
+                  }
+                : {}),
+            },
+            required: ['id'],
+          },
+        },
+        {
+          name: 'restoreConversation',
+          description: 'Restore a ticket from spam, trash or deleted',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              id: {
+                type: 'string',
+                description: 'Ticket number (e.g. 12345) or conversation ID',
+              },
+              state: {
+                type: 'string',
+                enum: ['unread', 'opened', 'closed', 'spam'],
+                description: 'State after restoring',
+                default: 'opened',
+              },
+            },
+            required: ['id'],
+          },
+        },
+        {
+          name: 'forwardConversation',
+          description:
+            'SENDS AN EMAIL IMMEDIATELY: forwards a ticket to the given addresses. The ticket keeps its state, and only gets a new subject if you pass one. Use only when the user explicitly asks.',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              conversationId: {
+                type: 'string',
+                description: 'Ticket number (e.g. 12345) or conversation ID',
+              },
+              to: {
+                type: 'array',
+                items: { type: 'string' },
+                description: 'Email addresses to forward to',
+              },
+              body: {
+                type: 'string',
+                description: 'Message to add to the forward',
+              },
+              subject: {
+                type: 'string',
+                description: 'New subject. This also renames the ticket',
+              },
+              cc: {
+                type: 'array',
+                items: { type: 'string' },
+                description: 'Email addresses to send a copy to',
+              },
+              bcc: {
+                type: 'array',
+                items: { type: 'string' },
+                description: 'Email addresses to send a hidden copy to',
+              },
+            },
+            required: ['conversationId', 'to', 'body'],
+          },
+        },
+        {
+          name: 'undoSend',
+          description: 'Cancel a mail just sent with sendMessage or forwardConversation. Only works right after sending, while Groove has not sent it yet.',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              conversationId: {
+                type: 'string',
+                description: 'Ticket number (e.g. 12345) or conversation ID',
+              },
+              changesetId: {
+                type: 'string',
+                description: 'The changesetId that sendMessage or forwardConversation returned',
+              },
+            },
+            required: ['conversationId', 'changesetId'],
+          },
+        },
+        {
+          name: 'editNote',
+          description: 'Change the text of an internal note. Use listMessages to find its ID.',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              messageId: {
+                type: 'string',
+                description: 'ID of the note',
+              },
+              body: {
+                type: 'string',
+                description: 'New text of the note',
+              },
+            },
+            required: ['messageId', 'body'],
+          },
+        },
+        {
+          name: 'deleteNote',
+          description: 'Delete an internal note. Confirm with the user first.',
+          annotations: { destructiveHint: true },
+          inputSchema: {
+            type: 'object',
+            properties: {
+              messageId: {
+                type: 'string',
+                description: 'ID of the note',
+              },
+            },
+            required: ['messageId'],
           },
         },
         {
@@ -290,7 +521,7 @@ export function createGrooveServer(opts: GrooveServerOptions): Server {
         },
         {
           name: 'listMessages',
-          description: 'List messages and notes in a conversation, oldest first',
+          description: 'List messages and notes in a conversation, oldest first. Groove can still return notes that were deleted, and mail that was moved to another ticket',
           inputSchema: {
             type: 'object',
             properties: {
@@ -323,6 +554,16 @@ export function createGrooveServer(opts: GrooveServerOptions): Server {
               body: {
                 type: 'string',
                 description: 'The message body content',
+              },
+              cc: {
+                type: 'array',
+                items: { type: 'string' },
+                description: 'Email addresses to send a copy to',
+              },
+              bcc: {
+                type: 'array',
+                items: { type: 'string' },
+                description: 'Email addresses to send a hidden copy to',
               },
             },
             required: ['conversationId', 'to', 'body'],
@@ -470,6 +711,72 @@ export function createGrooveServer(opts: GrooveServerOptions): Server {
           },
         },
         {
+          name: 'listCompanies',
+          description: 'List companies with optional search. Returns one page; if pageInfo.hasNextPage is true, more results exist.',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              search: {
+                type: 'string',
+                description: 'Search string to filter companies',
+              },
+              orderBy: {
+                type: 'object',
+                description: 'Sort order. Use CONVERSATION_COUNT with DESC for the companies with the most tickets. Groove sorts counts only roughly, so sort the result again before showing a ranking',
+                properties: {
+                  field: {
+                    type: 'string',
+                    enum: ['CONTACT_COUNT', 'CONVERSATION_COUNT', 'CREATED_AT', 'DOMAIN', 'NAME', 'UPDATED_AT'],
+                  },
+                  direction: {
+                    type: 'string',
+                    enum: ['ASC', 'DESC'],
+                    default: 'ASC',
+                  },
+                },
+                required: ['field'],
+              },
+              limit: {
+                type: 'number',
+                description: 'Maximum number of companies to return per page',
+                default: 20,
+              },
+              after: {
+                type: 'string',
+                description: 'Cursor for pagination',
+              },
+            },
+          },
+        },
+        {
+          name: 'updateCompany',
+          description: "Change a company's name or its extra domains. Groove often creates companies from mail domains, with no name or just the domain",
+          inputSchema: {
+            type: 'object',
+            properties: {
+              id: {
+                type: 'string',
+                description: 'The company ID',
+              },
+              name: {
+                type: 'string',
+                description: 'New name of the company',
+              },
+              addDomains: {
+                type: 'array',
+                items: { type: 'string' },
+                description: 'Extra domains to add (existing domains are kept)',
+              },
+              removeDomains: {
+                type: 'array',
+                items: { type: 'string' },
+                description: 'Extra domains to remove. The main domain cannot be removed',
+              },
+            },
+            required: ['id'],
+          },
+        },
+        {
           name: 'mergeContacts',
           description:
             'Permanently merge one contact into another, for example a typo address into the right one. This cannot be undone, so always confirm with the user first. ' +
@@ -583,7 +890,7 @@ export function createGrooveServer(opts: GrooveServerOptions): Server {
         },
         {
           name: 'updateContact',
-          description: 'Update contact information',
+          description: 'Update contact information, companies and extra email addresses',
           inputSchema: {
             type: 'object',
             properties: {
@@ -610,6 +917,26 @@ export function createGrooveServer(opts: GrooveServerOptions): Server {
               phone: {
                 type: 'string',
                 description: 'Contact phone number',
+              },
+              companyIds: {
+                type: 'array',
+                items: { type: 'string' },
+                description: 'Company IDs to add the contact to (existing companies are kept)',
+              },
+              removeCompanyIds: {
+                type: 'array',
+                items: { type: 'string' },
+                description: 'Company IDs to remove the contact from',
+              },
+              addSecondaryEmails: {
+                type: 'array',
+                items: { type: 'string' },
+                description: 'Extra email addresses to add to the contact (existing ones are kept)',
+              },
+              removeSecondaryEmails: {
+                type: 'array',
+                items: { type: 'string' },
+                description: 'Extra email addresses to remove. Use email to change the main address',
               },
             },
             required: ['id'],
@@ -770,6 +1097,59 @@ export function createGrooveServer(opts: GrooveServerOptions): Server {
           };
         }
 
+        case 'logConversation': {
+          if (!args || typeof args.channelId !== 'string' || typeof args.to !== 'string') {
+            throw new Error('channelId, to, subject and body are required');
+          }
+          const result = await conversationTools.logConversation(args as any);
+          return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
+        }
+
+        case 'deleteConversation': {
+          if (!args || typeof args.id !== 'string') throw new Error('id is required');
+          if (args.permanent && !allowPermanentDelete) {
+            throw new Error('Permanent deletion is off: it needs GROOVE_ALLOW_PERMANENT_DELETE=1');
+          }
+          const result = await conversationTools.deleteConversation(args as any);
+          return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
+        }
+
+        case 'restoreConversation': {
+          if (!args || typeof args.id !== 'string') throw new Error('id is required');
+          const result = await conversationTools.restoreConversation(args as any);
+          return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
+        }
+
+        case 'forwardConversation': {
+          if (!args || typeof args.conversationId !== 'string' || !Array.isArray(args.to) || typeof args.body !== 'string') {
+            throw new Error('conversationId, to and body are required');
+          }
+          const result = await conversationTools.forwardConversation(args as any);
+          return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
+        }
+
+        case 'undoSend': {
+          if (!args || typeof args.conversationId !== 'string' || typeof args.changesetId !== 'string') {
+            throw new Error('conversationId and changesetId are required');
+          }
+          const result = await messageTools.undoSend(args.conversationId, args.changesetId);
+          return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
+        }
+
+        case 'editNote': {
+          if (!args || typeof args.messageId !== 'string' || typeof args.body !== 'string') {
+            throw new Error('messageId and body are required');
+          }
+          const result = await messageTools.editNote(args.messageId, args.body);
+          return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
+        }
+
+        case 'deleteNote': {
+          if (!args || typeof args.messageId !== 'string') throw new Error('messageId is required');
+          const result = await messageTools.deleteNote(args.messageId);
+          return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
+        }
+
         case 'updateConversation': {
           if (!args || typeof args.id !== 'string') {
             throw new Error('Conversation ID is required');
@@ -917,6 +1297,19 @@ export function createGrooveServer(opts: GrooveServerOptions): Server {
               },
             ],
           };
+        }
+
+        case 'listCompanies': {
+          const result = await contactTools.listCompanies(args || {});
+          return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
+        }
+
+        case 'updateCompany': {
+          if (!args || typeof args.id !== 'string') {
+            throw new Error('id is required');
+          }
+          const company = await contactTools.updateCompany(args as any);
+          return { content: [{ type: 'text', text: JSON.stringify(company, null, 2) }] };
         }
 
         case 'mergeContacts': {

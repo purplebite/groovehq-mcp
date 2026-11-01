@@ -15,15 +15,20 @@ Both repos use Groove's REST API for conversations. This one runs on GraphQL onl
 - `listConversations`: search and filter by keyword, state, agent, team, contact, channel, or tag
 - `getConversation`: get one ticket
 - `createConversation`: start a new ticket by sending an email
-- `updateConversation`: change the state, assign or unassign someone, or add or remove tags
+- `logConversation`: Groove's Log a Conversation. Start a ticket with an internal note, for example after a phone call. It never sends mail
+- `updateConversation`: change the state, subject, contact, or mailbox, mark a ticket unread, spam, or trash, star or follow it, assign or unassign someone, or add or remove tags
 - `closeConversation`: the most satisfying one
 - `mergeConversations`: merge one ticket into another. This can't be undone
+- `forwardConversation`: forward a ticket by email. The ticket stays as it was
+- `deleteConversation`, `restoreConversation`: delete a ticket and bring it back
 
 **Messages**
 
 - `listMessages`: every message and note on a ticket, oldest first
 - `sendMessage`: send an email reply
+- `undoSend`: cancel a mail right after sending it
 - `createNote`: leave an internal note
+- `editNote`, `deleteNote`: change or remove an internal note
 - `createReplyDraft`: save a reply or note as a draft for someone to review. It never sends
 - `listDrafts`, `deleteDraft`: see and remove your own drafts
 
@@ -32,6 +37,7 @@ Both repos use Groove's REST API for conversations. This one runs on GraphQL onl
 - `listContacts`, `getContact`, `createContact`, `updateContact`
 - `mergeContacts`: merge a typo or duplicate contact into the right one. This can't be undone
 - `deleteContact`, `deleteContacts`: delete contacts without tickets, which also removes them from recipient suggestions. This can't be undone
+- `listCompanies`, `updateCompany`: find companies, and change a company's name or extra domains
 - `listAgents`, `getAgent`
 - `listChannels`, `getChannel`
 - `listTags`, `listTeams`
@@ -73,17 +79,18 @@ import { createGrooveServer } from 'groovehq-mcp/server';
 const server = createGrooveServer({ token: 'your_token_here', readOnly: true });
 ```
 
-`allowSend`, `allowMerge`, `allowContactDelete`, and `apiUrl` are optional too. Sending stays off unless you set `allowSend: true`, merging and deleting contacts stay on unless you set them to `false`, and `readOnly` always wins.
+`allowSend`, `allowMerge`, `allowContactDelete`, `allowPermanentDelete`, and `apiUrl` are optional too. Sending and permanent deletion stay off unless you set them to `true`, merging and deleting contacts stay on unless you set them to `false`, and `readOnly` always wins.
 
 ## Handle with care
 
 This server can send real email to real customers. A few things keep that honest:
 
-- **Sending is off by default.** `sendMessage` and `createConversation` only appear when you set `GROOVE_ALLOW_SEND=1`.
+- **Sending is off by default.** `sendMessage`, `createConversation`, `forwardConversation`, and `undoSend` only appear when you set `GROOVE_ALLOW_SEND=1`.
 - **Read-only mode.** Set `GROOVE_READ_ONLY=1` to leave out every tool that writes, including drafts.
-- **Recipients are always explicit.** `createConversation` and `sendMessage` require a `to` address, and nothing is sent to a default.
+- **Recipients are always explicit.** `createConversation` and `sendMessage` require a `to` address, nothing is sent to a default, and `cc` and `bcc` are optional.
 - **Merging is permanent.** Only the target ticket stays, with its own contact, subject, and assignee. Replies and notes move over, tags are combined, and an open ticket reopens the target. `mergeConversations` is marked as destructive, and it refuses tickets with different contacts or your own drafts on the merged ticket unless told otherwise. Set `GROOVE_ALLOW_MERGE=0` to turn off merging tickets and contacts.
 - **Deleting contacts is permanent.** A contact with tickets can't be deleted, so move those first with `mergeContacts`. Both delete tools only show what they would do until you pass `confirm: true`, and `deleteContacts` takes at most 100 contacts per call. Set `GROOVE_ALLOW_CONTACT_DELETE=0` to turn deleting off.
+- **Permanent deletion is off by default.** `deleteConversation` can always be restored, unless you set `GROOVE_ALLOW_PERMANENT_DELETE=1` and pass `permanent: true`.
 - **Failed updates tell you what happened.** Groove has no all-or-nothing update, so `updateConversation` can succeed halfway. When it does, the error says which steps already went through.
 
 Sending a draft from Groove may close the ticket, depending on your Groove settings.
@@ -98,7 +105,10 @@ Your MCP client will usually ask before a tool runs. For sending mail, it's a go
 - **Merged messages don't get sorted.** Groove adds them to the end of the ticket with their original dates, while `listMessages` always sorts by date.
 - **0 tickets doesn't always mean unused.** A contact's mail can sit in someone else's ticket after a merge. If you delete that contact, the mail stays but no longer shows who wrote it, and there's no practical way to check beforehand which contacts this affects.
 - **Orphans come in batches.** `listContacts` with `orphansOnly` reads at most 500 contacts per call. Call it again for more, but Groove's list isn't strictly sorted and can repeat contacts, so there's no guarantee you've seen them all.
-- **Some things aren't in here yet.** You can't send attachments, use cc and bcc when sending directly, or set a contact's company.
+- **Companies come from mail domains.** Groove creates them by itself, often without a name, and a contact can have several. `updateContact` adds or removes one and keeps the others, and it also manages extra email addresses.
+- **Mailbox moves need access.** A ticket can't be moved to a mailbox your account can't reach, because it would get stuck there.
+- **`listMessages` can show too much.** Groove can still return deleted notes, mail moved to another ticket, and undone mail as an empty message.
+- **Some things aren't in here yet.** You can't send attachments, add reactions to notes, or link tickets to other tools.
 
 ## Development
 
@@ -150,6 +160,12 @@ To test contacts, add `--contacts` and set `GROOVE_TEST_TO` to an address that h
 
 ```bash
 GROOVE_API_TOKEN=your_token_here GROOVE_TEST_TO=you@example.com npm run test:live -- --contacts
+```
+
+To test ticket changes, add `--tickets`. It asks first, then sends a forward and a reply that it undoes, to plus addresses of `GROOVE_TEST_TO`, and changes and deletes test tickets:
+
+```bash
+GROOVE_API_TOKEN=your_token_here GROOVE_TEST_TO=you@example.com GROOVE_TEST_CHANNEL=ch_123 npm run test:live -- --tickets
 ```
 
 ## License

@@ -245,6 +245,16 @@ export const queries = {
     }
   `,
 
+  getChannelTicket: `
+    query GetChannelTicket($filter: ConversationFilter) {
+      conversations(first: 1, filter: $filter) {
+        nodes {
+          id
+        }
+      }
+    }
+  `,
+
   getTicketNode: `
     query GetTicketNode($id: ID!) {
       node(id: $id) {
@@ -266,6 +276,59 @@ export const queries = {
         pageInfo {
           hasNextPage
           endCursor
+        }
+      }
+    }
+  `,
+
+  listCompanies: `
+    query ListCompanies($first: Int, $after: String, $filter: CompanyFilter, $orderBy: CompanyOrder) {
+      companies(first: $first, after: $after, filter: $filter, orderBy: $orderBy) {
+        nodes {
+          id
+          name
+          domain
+          conversationCount
+        }
+        pageInfo {
+          hasNextPage
+          endCursor
+        }
+      }
+    }
+  `,
+
+  getCompany: `
+    query GetCompany($id: ID!) {
+      node(id: $id) {
+        ... on Company {
+          id
+          name
+          domain
+          conversationCount
+          customFieldValues(first: 50) {
+            nodes {
+              customField {
+                key
+              }
+              value {
+                ... on Text {
+                  content
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  `,
+
+  listCustomFields: `
+    query ListCustomFields {
+      customFields(first: 100) {
+        nodes {
+          id
+          key
         }
       }
     }
@@ -369,6 +432,217 @@ export const queries = {
 };
 
 export const mutations = {
+  conversationSubject: `
+    mutation ConversationSubject($input: ConversationSubjectInput!) {
+      conversationSubject(input: $input) {
+        conversation {
+          ${CONVERSATION_FIELDS}
+        }
+        errors {
+          message
+          path
+        }
+      }
+    }
+  `,
+
+  conversationChangeContact: `
+    mutation ConversationChangeContact($input: ConversationChangeContactInput!) {
+      conversationChangeContact(input: $input) {
+        conversation {
+          ${CONVERSATION_FIELDS}
+        }
+        errors {
+          message
+          path
+        }
+      }
+    }
+  `,
+
+  conversationChangeChannel: `
+    mutation ConversationChangeChannel($input: ConversationChangeChannelInput!) {
+      conversationChangeChannel(input: $input) {
+        conversation {
+          ${CONVERSATION_FIELDS}
+        }
+        errors {
+          message
+          path
+        }
+      }
+    }
+  `,
+
+  conversationStar: `
+    mutation ConversationStar($input: ConversationStarInput!) {
+      conversationStar(input: $input) {
+        conversation {
+          ${CONVERSATION_FIELDS}
+        }
+        errors {
+          message
+          path
+        }
+      }
+    }
+  `,
+
+  conversationUnstar: `
+    mutation ConversationUnstar($input: ConversationUnstarInput!) {
+      conversationUnstar(input: $input) {
+        conversation {
+          ${CONVERSATION_FIELDS}
+        }
+        errors {
+          message
+          path
+        }
+      }
+    }
+  `,
+
+  conversationUnread: `
+    mutation ConversationUnread($input: ConversationUnreadInput!) {
+      conversationUnread(input: $input) {
+        conversation {
+          ${CONVERSATION_FIELDS}
+        }
+        errors {
+          message
+          path
+        }
+      }
+    }
+  `,
+
+  conversationSpam: `
+    mutation ConversationSpam($input: ConversationSpamInput!) {
+      conversationSpam(input: $input) {
+        conversation {
+          ${CONVERSATION_FIELDS}
+        }
+        errors {
+          message
+          path
+        }
+      }
+    }
+  `,
+
+  conversationTrash: `
+    mutation ConversationTrash($input: ConversationTrashInput!) {
+      conversationTrash(input: $input) {
+        conversation {
+          ${CONVERSATION_FIELDS}
+        }
+        errors {
+          message
+          path
+        }
+      }
+    }
+  `,
+
+  conversationFollow: `
+    mutation ConversationFollow($input: ConversationFollowInput!) {
+      conversationFollow(input: $input) {
+        conversation {
+          ${CONVERSATION_FIELDS}
+        }
+        errors {
+          message
+          path
+        }
+      }
+    }
+  `,
+
+  conversationUnfollow: `
+    mutation ConversationUnfollow($input: ConversationUnfollowInput!) {
+      conversationUnfollow(input: $input) {
+        conversation {
+          ${CONVERSATION_FIELDS}
+        }
+        errors {
+          message
+          path
+        }
+      }
+    }
+  `,
+
+  conversationEditNote: `
+    mutation ConversationEditNote($input: conversationEditNoteInput!) {
+      conversationEditNote(input: $input) {
+        errors {
+          message
+          path
+        }
+      }
+    }
+  `,
+
+  conversationDeleteNote: `
+    mutation ConversationDeleteNote($input: conversationDeleteNoteInput!) {
+      conversationDeleteNote(input: $input) {
+        errors {
+          message
+          path
+        }
+      }
+    }
+  `,
+
+  conversationUndoSend: `
+    mutation ConversationUndoSend($input: conversationUndoSendInput!) {
+      conversationUndoSend(input: $input) {
+        errors {
+          message
+          path
+        }
+      }
+    }
+  `,
+
+  conversationRestore: `
+    mutation ConversationRestore($input: conversationRestoreInput!) {
+      conversationRestore(input: $input) {
+        errors {
+          message
+          path
+        }
+      }
+    }
+  `,
+
+  conversationDelete: `
+    mutation ConversationDelete($input: ConversationDeleteInput!) {
+      conversationDelete(input: $input) {
+        deletedConversationIds
+        errors {
+          message
+          path
+        }
+      }
+    }
+  `,
+
+  conversationForwardV2: `
+    mutation ConversationForwardV2($input: ConversationForwardV2Input!) {
+      conversationForwardV2(input: $input) {
+        changesetId
+        conversation {
+          ${CONVERSATION_FIELDS}
+        }
+        errors {
+          message
+          path
+        }
+      }
+    }
+  `,
+
   draftUpsert: `
     mutation DraftUpsert($input: DraftUpsertInput!) {
       draftUpsert(input: $input) {
@@ -406,6 +680,20 @@ export const mutations = {
     }
   `,
 
+  conversationLog: `
+    mutation ConversationLog($input: ConversationLogInput!) {
+      conversationLog(input: $input) {
+        conversation {
+          ${CONVERSATION_FIELDS}
+        }
+        errors {
+          message
+          path
+        }
+      }
+    }
+  `,
+
   conversationClose: `
     mutation ConversationClose($input: ConversationCloseInput!) {
       conversationClose(input: $input) {
@@ -423,6 +711,7 @@ export const mutations = {
   conversationReply: `
     mutation ConversationReply($input: ConversationReplyInput!) {
       conversationReply(input: $input) {
+        changesetId
         conversation {
           ${CONVERSATION_FIELDS}
         }
@@ -538,6 +827,49 @@ export const mutations = {
         target {
           ${CONVERSATION_FIELDS}
         }
+        errors {
+          message
+          path
+        }
+      }
+    }
+  `,
+
+  companyAddContacts: `
+    mutation CompanyAddContacts($input: CompanyAddContactsInput!) {
+      companyAddContacts(input: $input) {
+        company {
+          id
+          name
+          domain
+        }
+        errors {
+          message
+          path
+        }
+      }
+    }
+  `,
+
+  companyRemoveContacts: `
+    mutation CompanyRemoveContacts($input: CompanyRemoveContactsInput!) {
+      companyRemoveContacts(input: $input) {
+        company {
+          id
+          name
+          domain
+        }
+        errors {
+          message
+          path
+        }
+      }
+    }
+  `,
+
+  customFieldRemove: `
+    mutation CustomFieldRemove($input: CustomFieldRemoveInput!) {
+      customFieldRemove(input: $input) {
         errors {
           message
           path

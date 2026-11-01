@@ -41,6 +41,34 @@ interface UpdateContactArgs {
   lastName?: string;
   title?: string;
   phone?: string;
+  companyIds?: string[];
+  removeCompanyIds?: string[];
+  addSecondaryEmails?: string[];
+  removeSecondaryEmails?: string[];
+}
+
+interface UpdateCompanyArgs {
+  id: string;
+  name?: string;
+  addDomains?: string[];
+  removeDomains?: string[];
+}
+
+interface ListCompaniesArgs {
+  search?: string;
+  orderBy?: {
+    field: string;
+    direction?: 'ASC' | 'DESC';
+  };
+  limit?: number;
+  after?: string;
+}
+
+interface Company {
+  id: string;
+  name: string | null;
+  domain: string | null;
+  conversationCount?: number;
 }
 
 interface MergeContactsArgs {
@@ -70,6 +98,9 @@ const RATE_LIMIT_RETRIES = 3;
 
 const SENDER_WARNING =
   'Mail this contact wrote in a merged ticket loses its sender when the contact is deleted. Groove cannot show which contacts this affects.';
+
+const EMAIL_PATTERN = /^[^\s,;<>@]+@[^\s,;<>@]+\.[^\s,;<>@]+$/;
+const DOMAIN_PATTERN = /^[a-z0-9-]+(\.[a-z0-9-]+)+$/i;
 
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
@@ -194,17 +225,179 @@ export class ContactTools {
 
   async updateContact(args: UpdateContactArgs): Promise<Contact | null> {
     const customFieldList = toCustomFields(args);
+    const addIds = args.companyIds ?? [];
+    const removeIds = args.removeCompanyIds ?? [];
+    const addEmails = (args.addSecondaryEmails ?? []).map(email => email.trim().toLowerCase());
+    const removeEmails = (args.removeSecondaryEmails ?? []).map(email => email.trim().toLowerCase());
 
-    if (customFieldList.length === 0) {
-      throw new Error('Provide at least one of email, firstName, lastName, title or phone');
+    if (
+      customFieldList.length === 0 &&
+      !addIds.length &&
+      !removeIds.length &&
+      !addEmails.length &&
+      !removeEmails.length
+    ) {
+      throw new Error(
+        'Provide at least one of email, firstName, lastName, title, phone, companyIds, removeCompanyIds, addSecondaryEmails or removeSecondaryEmails'
+      );
+    }
+    this.checkValues(addEmails, EMAIL_PATTERN, 'email address');
+    if (removeEmails.some(email => addEmails.includes(email))) {
+      throw new Error('An address cannot be in both addSecondaryEmails and removeSecondaryEmails');
+    }
+    if (removeIds.some(id => addIds.includes(id))) {
+      throw new Error('A company cannot be in both companyIds and removeCompanyIds');
     }
 
-    await this.client.mutate(mutations.customFieldValuesUpdate, 'customFieldValuesUpdate', {
-      subjectId: args.id,
-      customFieldList,
-    });
+    if (customFieldList.length) {
+      await this.client.mutate(mutations.customFieldValuesUpdate, 'customFieldValuesUpdate', {
+        subjectId: args.id,
+        customFieldList,
+      });
+    }
+
+    if (addEmails.length || removeEmails.length) {
+      const contact = await this.getContact(args.id);
+      await this.changeList(
+        args.id,
+        'contact_secondary_emails',
+        contact?.secondaryEmails ?? [],
+        addEmails,
+        removeEmails
+      );
+    }
+
+    const contactIds = [args.id];
+    for (const companyId of removeIds) {
+      await this.client.mutate(mutations.companyRemoveContacts, 'companyRemoveContacts', {
+        companyId,
+        contactIds,
+      });
+    }
+    for (const companyId of addIds) {
+      await this.client.mutate(mutations.companyAddContacts, 'companyAddContacts', {
+        companyId,
+        contactIds,
+      });
+    }
 
     return this.getContact(args.id);
+  }
+
+  async updateCompany(args: UpdateCompanyArgs) {
+    const addDomains = (args.addDomains ?? []).map(domain => domain.trim().toLowerCase());
+    const removeDomains = (args.removeDomains ?? []).map(domain => domain.trim().toLowerCase());
+
+    if (args.name === undefined && !addDomains.length && !removeDomains.length) {
+      throw new Error('Provide at least one of name, addDomains or removeDomains');
+    }
+    this.checkValues(addDomains, DOMAIN_PATTERN, 'domain');
+    if (removeDomains.some(domain => addDomains.includes(domain))) {
+      throw new Error('A domain cannot be in both addDomains and removeDomains');
+    }
+
+    if (args.name !== undefined) {
+      await this.client.mutate(mutations.customFieldValuesUpdate, 'customFieldValuesUpdate', {
+        subjectId: args.id,
+        customFieldList: [{ customFieldIdOrKey: 'company_name', value: args.name }],
+      });
+    }
+
+    if (addDomains.length || removeDomains.length) {
+      const { domains } = await this.getCompany(args.id);
+      await this.changeList(args.id, 'company_secondary_domains', domains, addDomains, removeDomains);
+    }
+
+    return this.getCompany(args.id);
+  }
+
+  private async getCompany(id: string) {
+    const { node } = await this.client.request<{
+      node:
+        | (Company & {
+            customFieldValues: {
+              nodes: Array<{ customField: { key: string }; value: { content?: string } }>;
+            };
+          })
+        | null;
+    }>(queries.getCompany, { id });
+    if (!node?.id) throw new Error(`Company not found: ${id}`);
+
+    const { customFieldValues, ...company } = node;
+    const domains = customFieldValues.nodes
+      .filter(row => row.customField.key === 'company_secondary_domains')
+      .map(row => row.value.content ?? '');
+    return { ...company, domains };
+  }
+
+  private checkValues(values: string[], pattern: RegExp, label: string): void {
+    const invalid = values.find(value => !pattern.test(value));
+    if (invalid !== undefined) throw new Error(`Not a valid ${label}: ${invalid}`);
+  }
+
+  // Groove adds to these lists one value at a time, and can only remove the first value.
+  // So removing clears the list and puts the rest back.
+  private async changeList(
+    subjectId: string,
+    key: string,
+    current: string[],
+    add: string[],
+    remove: string[]
+  ): Promise<void> {
+    const lower = current.map(value => value.toLowerCase());
+    const missing = remove.find(value => !lower.includes(value));
+    if (missing !== undefined) throw new Error(`${missing} is not on this list`);
+
+    const addValue = (value: string) =>
+      this.client.mutate(mutations.customFieldValuesUpdate, 'customFieldValuesUpdate', {
+        subjectId,
+        customFieldList: [{ customFieldIdOrKey: key, value }],
+      });
+
+    if (remove.length) {
+      const { customFields } = await this.client.request<{
+        customFields: { nodes: Array<{ id: string; key: string }> };
+      }>(queries.listCustomFields);
+      const customFieldId = customFields.nodes.find(field => field.key === key)?.id;
+      if (!customFieldId) throw new Error(`Custom field not found: ${key}`);
+
+      const keep = current.filter(value => !remove.includes(value.toLowerCase()));
+      try {
+        for (let index = 0; index < current.length; index++) {
+          await this.client.mutate(mutations.customFieldRemove, 'customFieldRemove', {
+            customFieldId,
+            itemId: subjectId,
+          });
+        }
+        for (const value of keep) await addValue(value);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        throw new Error(`${message} (the list should be: ${keep.join(', ') || 'empty'})`);
+      }
+    }
+
+    for (const value of add) await addValue(value);
+  }
+
+  async listCompanies(args: ListCompaniesArgs = {}) {
+    const response = await this.client.request<{
+      companies: {
+        nodes: Company[];
+        pageInfo: {
+          hasNextPage: boolean;
+          endCursor: string | null;
+        };
+      };
+    }>(queries.listCompanies, {
+      first: args.limit || 20,
+      after: args.after,
+      filter: args.search ? { search: args.search } : undefined,
+      orderBy: args.orderBy
+        ? { field: args.orderBy.field, direction: args.orderBy.direction ?? 'ASC' }
+        : undefined,
+    });
+
+    return { companies: response.companies.nodes, pageInfo: response.companies.pageInfo };
   }
 
   async mergeContacts(args: MergeContactsArgs) {
