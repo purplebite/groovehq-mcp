@@ -423,6 +423,45 @@ export const queries = {
     }
   `,
 
+  listFolders: `
+    query ListFolders($first: Int, $after: String, $filter: FolderFilter) {
+      folders(first: $first, after: $after, filter: $filter) {
+        nodes {
+          id
+          name
+          channelRestriction
+          restriction {
+            teams {
+              id
+              name
+            }
+            agents {
+              id
+              name
+            }
+          }
+          channels(first: 100) {
+            nodes {
+              id
+              name
+            }
+          }
+          conditions(first: 20) {
+            nodes {
+              param
+              operator
+              value
+            }
+          }
+        }
+        pageInfo {
+          hasNextPage
+          endCursor
+        }
+      }
+    }
+  `,
+
   listKbArticles: `
     query ListKbArticles($filter: ArticleFilter, $first: Int, $after: String) {
       articles(filter: $filter, first: $first, after: $after) {

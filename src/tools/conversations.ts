@@ -11,6 +11,7 @@ interface ListConversationsArgs {
   assignedTeamId?: string;
   contactId?: string;
   channelId?: string;
+  folderId?: string;
   tagIds?: string[];
   keywords?: string;
   limit?: number;
@@ -124,6 +125,7 @@ export class ConversationTools {
     if (args.assignedTeamId) filter.assigned = { ...filter.assigned, team: args.assignedTeamId };
     if (args.contactId) filter.contactId = args.contactId;
     if (args.channelId) filter.channelId = args.channelId;
+    if (args.folderId) filter.folderId = args.folderId;
     if (args.tagIds) filter.tags = args.tagIds;
     if (args.keywords) filter.keywords = args.keywords;
 
@@ -135,7 +137,15 @@ export class ConversationTools {
           endCursor: string | null;
         };
       };
-    }>(queries.listConversations, { first: args.limit || 20, after: args.after, filter });
+    }>(queries.listConversations, { first: args.limit || 20, after: args.after, filter }).catch((error: Error) => {
+      if (!args.folderId) throw error;
+      if (error.message.includes('No folder found')) throw new Error(`Folder not found: ${args.folderId}`);
+      // Groove gives this for a folder that's turned off or limited to other agents
+      if (error.message.includes('Cannot return null')) {
+        throw new Error(`Folder not available to this agent: ${args.folderId}`);
+      }
+      throw error;
+    });
 
     return {
       conversations: response.conversations.nodes,

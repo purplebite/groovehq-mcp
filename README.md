@@ -12,7 +12,7 @@ Both repos use Groove's REST API for conversations. This one runs on GraphQL onl
 
 **Tickets**
 
-- `listConversations`: search and filter by keyword, state, agent, team, contact, channel, or tag
+- `listConversations`: search and filter by keyword, state, agent, team, contact, channel, tag, or Smart Folder
 - `getConversation`: get one ticket
 - `createConversation`: start a new ticket by sending an email, in a chosen `state`
 - `logConversation`: Groove's Log a Conversation. Start a ticket with an internal note, for example after a phone call. It never sends mail
@@ -41,6 +41,7 @@ Both repos use Groove's REST API for conversations. This one runs on GraphQL onl
 - `listCompanies`, `updateCompany`: find companies, and change a company's name or extra domains
 - `listAgents`, `getAgent`
 - `listChannels`, `getChannel`
+- `listFolders`: see the Smart Folders you can use in `listConversations`
 - `listTags`, `listTeams`
 - `searchKbArticles`
 
@@ -110,6 +111,7 @@ Your MCP client will usually ask before a tool runs. Every tool is labeled as re
 - **0 tickets doesn't always mean unused.** A contact's mail can sit in someone else's ticket after a merge. If you delete that contact, the mail stays but no longer shows who wrote it, and there's no practical way to check beforehand which contacts this affects.
 - **Orphans come in batches.** `listContacts` with `orphansOnly` reads at most 500 contacts per call. Call it again for more, but Groove's list isn't strictly sorted and can repeat contacts, so there's no guarantee you've seen them all.
 - **Companies come from mail domains.** Groove creates them by itself, often without a name, and a contact can have several. `updateContact` adds or removes one and keeps the others, and it also manages extra email addresses.
+- **Smart Folders follow the token.** `listFolders` shows the active Smart Folders that the agent who owns the API token can open, in sidebar order, so personal ones like Mine belong to that agent. Names can repeat, so each folder also lists its teams, mailboxes, and the team it filters on. Names with only punctuation, like `-`, are left out.
 - **Mailbox moves need access.** A ticket can't be moved to a mailbox your account can't reach, because you couldn't access the ticket afterwards.
 - **`listMessages` can show too much.** Groove can still return deleted notes, mail moved to another ticket, and undone mail as an empty message.
 

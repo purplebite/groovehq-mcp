@@ -641,6 +641,37 @@ await test('listTeams returns teams that filter tickets', async () => {
   return `${teams.length} teams`;
 });
 
+const folders = await call('listFolders');
+
+await test('listFolders returns folders that filter tickets', async () => {
+  expect(folders.length > 0, 'no folders');
+  expect(new Set(ids(folders)).size === folders.length, 'duplicate folders');
+  expect(folders.every(folder => folder.name && /[^\s\p{P}]/u.test(folder.name)), 'divider in the list');
+  expect(folders.every(folder => folder.channels === 'all' || folder.channels.length > 0), 'folder without mailboxes');
+  expect(folders.every(folder => !folder.assignedTeam || ids(teams).includes(folder.assignedTeam.id)), 'unknown team');
+  await call('listConversations', { folderId: folders[0].id, limit: 1 });
+  return `${folders.length} folders`;
+});
+
+await test('folderId works with state and keywords', async () => {
+  const folder = folders.find(row => row.channels === 'all') ?? folders[0];
+  for (const filters of [{ state: 'opened' }, { keywords: 'test' }]) {
+    await call('listConversations', { folderId: folder.id, limit: 1, ...filters });
+  }
+});
+
+await test('folderId works with one of its mailboxes', async () => {
+  const folder = folders.find(row => row.channels !== 'all');
+  if (!folder) return 'no folder limited to a mailbox';
+  const { conversations } = await call('listConversations', { folderId: folder.id, channelId: folder.channels[0].id, limit: 5 });
+  expect(conversations.every(row => row.channel.id === folder.channels[0].id), 'wrong mailbox');
+});
+
+await test('unknown folders give a clear error', async () => {
+  const error = await fails('listConversations', { folderId: 'fol_0000000000' });
+  expect(error === 'Folder not found: fol_0000000000', 'wrong error');
+});
+
 await test('searchKbArticles', async () => `${(await call('searchKbArticles', { query: 'help' })).length} found`);
 
 await test('unknown tickets give a clear error', async () => {

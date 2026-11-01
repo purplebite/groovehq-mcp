@@ -13,6 +13,7 @@ import { AgentTools } from './tools/agents.js';
 import { ChannelTools } from './tools/channels.js';
 import { TagTools } from './tools/tags.js';
 import { TeamTools } from './tools/teams.js';
+import { FolderTools } from './tools/folders.js';
 import { DraftTools } from './tools/drafts.js';
 import { KnowledgeBaseResources } from './resources/kb-articles.js';
 
@@ -102,13 +103,14 @@ export function createGrooveServer(opts: GrooveServerOptions): Server {
   const channelTools = new ChannelTools(grooveClient);
   const tagTools = new TagTools(grooveClient);
   const teamTools = new TeamTools(grooveClient);
+  const folderTools = new FolderTools(grooveClient);
   const draftTools = new DraftTools(grooveClient);
   const kbResources = new KnowledgeBaseResources(grooveClient);
 
   const server = new Server(
     {
       name: 'groovehq-mcp',
-      version: '0.8.1',
+      version: '0.9.0',
     },
     {
       capabilities: {
@@ -148,6 +150,10 @@ export function createGrooveServer(opts: GrooveServerOptions): Server {
               channelId: {
                 type: 'string',
                 description: 'Filter by channel ID',
+              },
+              folderId: {
+                type: 'string',
+                description: "Only tickets in this Smart Folder. Get the ID from listFolders. Don't combine it with channelId, unless that mailbox is listed for the folder.",
               },
               tagIds: {
                 type: 'array',
@@ -1098,6 +1104,15 @@ export function createGrooveServer(opts: GrooveServerOptions): Server {
           },
         },
         {
+          name: 'listFolders',
+          annotations: READ_TOOL,
+          description: 'List the Smart Folders this agent can open, in sidebar order, with their teams, agents, mailboxes, and the team they filter on. Names can repeat, so check these before you pick one.',
+          inputSchema: {
+            type: 'object',
+            properties: {},
+          },
+        },
+        {
           name: 'listChannels',
           annotations: READ_TOOL,
           description: 'List all available channels/inboxes',
@@ -1553,6 +1568,18 @@ export function createGrooveServer(opts: GrooveServerOptions): Server {
               {
                 type: 'text',
                 text: JSON.stringify(teams, null, 2),
+              },
+            ],
+          };
+        }
+
+        case 'listFolders': {
+          const folders = await folderTools.listFolders();
+          return {
+            content: [
+              {
+                type: 'text',
+                text: JSON.stringify(folders, null, 2),
               },
             ],
           };

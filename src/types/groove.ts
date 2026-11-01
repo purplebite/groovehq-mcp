@@ -100,6 +100,20 @@ export interface Team {
   description?: string;
 }
 
+export interface FolderOwner {
+  id: string;
+  name: string;
+}
+
+export interface Folder {
+  id: string;
+  name: string;
+  teams: FolderOwner[];
+  agents: FolderOwner[];
+  channels: FolderOwner[] | 'all';
+  assignedTeam: FolderOwner | null;
+}
+
 export interface Tag {
   id: string;
   name: string;
