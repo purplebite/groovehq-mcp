@@ -79,7 +79,7 @@ import { createGrooveServer } from 'groovehq-mcp/server';
 const server = createGrooveServer({ token: 'your_token_here', readOnly: true });
 ```
 
-`allowSend`, `allowMerge`, `allowContactDelete`, `allowPermanentDelete`, and `apiUrl` are optional too. Sending and permanent deletion stay off unless you set them to `true`, merging and deleting contacts stay on unless you set them to `false`, and `readOnly` always wins.
+`allowSend`, `allowMerge`, `allowPermanentDelete`, and `apiUrl` are optional too. Sending and permanent deletion stay off unless you set them to `true`, merging stays on unless you set `allowMerge: false`, and `readOnly` always wins.
 
 ## Handle with care
 
@@ -89,8 +89,7 @@ This server can send real email to real customers. A few things keep that honest
 - **Read-only mode.** Set `GROOVE_READ_ONLY=1` to leave out every tool that writes, including drafts.
 - **Recipients are always explicit.** `createConversation` and `sendMessage` require a `to` address, nothing is sent to a default, and `cc` and `bcc` are optional.
 - **Merging is permanent.** Only the target ticket stays, with its own contact, subject, and assignee. Replies and notes move over, tags are combined, and an open ticket reopens the target. `mergeConversations` is marked as destructive, and it refuses tickets with different contacts or your own drafts on the merged ticket unless told otherwise. Set `GROOVE_ALLOW_MERGE=0` to turn off merging tickets and contacts.
-- **Deleting contacts is permanent.** A contact with tickets can't be deleted, so move those first with `mergeContacts`. Both delete tools only show what they would do until you pass `confirm: true`, and `deleteContacts` takes at most 100 contacts per call. Set `GROOVE_ALLOW_CONTACT_DELETE=0` to turn deleting off.
-- **Permanent deletion is off by default.** `deleteConversation` can always be restored, unless you set `GROOVE_ALLOW_PERMANENT_DELETE=1` and pass `permanent: true`.
+- **Deleting is limited.** A deleted ticket can always be restored, unless you set `GROOVE_ALLOW_PERMANENT_DELETE=1` and pass `permanent: true`. A deleted contact is gone for good, so contacts with tickets can't be deleted at all: merge them first with `mergeContacts`. Other contacts are only deleted with `confirm: true`, at most 100 per call.
 - **Failed updates tell you what happened.** Groove has no all-or-nothing update, so `updateConversation` can succeed halfway. When it does, the error says which steps already went through.
 
 Sending a draft from Groove may close the ticket, depending on your Groove settings.

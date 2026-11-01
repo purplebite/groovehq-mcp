@@ -24,16 +24,16 @@ export interface GrooveServerOptions {
   readOnly?: boolean;
   allowSend?: boolean;
   allowMerge?: boolean;
-  allowContactDelete?: boolean;
   allowPermanentDelete?: boolean;
 }
 
 const SEND_TOOLS = ['createConversation', 'sendMessage', 'forwardConversation', 'undoSend'];
 const MERGE_TOOLS = ['mergeConversations', 'mergeContacts'];
-const CONTACT_DELETE_TOOLS = ['deleteContact', 'deleteContacts'];
 const WRITE_TOOLS = [
   'logConversation',
   'deleteConversation',
+  'deleteContact',
+  'deleteContacts',
   'restoreConversation',
   'editNote',
   'deleteNote',
@@ -55,13 +55,11 @@ export function createGrooveServer(opts: GrooveServerOptions): Server {
   const readOnly = opts.readOnly === true;
   const allowSend = opts.allowSend === true && !readOnly;
   const allowMerge = opts.allowMerge !== false && !readOnly;
-  const allowContactDelete = opts.allowContactDelete !== false && !readOnly;
   const allowPermanentDelete = opts.allowPermanentDelete === true && !readOnly;
 
   function isEnabled(tool: string): boolean {
     if (SEND_TOOLS.includes(tool)) return allowSend;
     if (MERGE_TOOLS.includes(tool)) return allowMerge;
-    if (CONTACT_DELETE_TOOLS.includes(tool)) return allowContactDelete;
     if (WRITE_TOOLS.includes(tool)) return !readOnly;
     return true;
   }
@@ -80,7 +78,7 @@ export function createGrooveServer(opts: GrooveServerOptions): Server {
   const server = new Server(
     {
       name: 'groovehq-mcp',
-      version: '0.6.0',
+      version: '0.6.1',
     },
     {
       capabilities: {
@@ -1045,9 +1043,7 @@ export function createGrooveServer(opts: GrooveServerOptions): Server {
           ? 'GROOVE_READ_ONLY is on'
           : MERGE_TOOLS.includes(name)
             ? 'merging is turned off with GROOVE_ALLOW_MERGE=0'
-            : CONTACT_DELETE_TOOLS.includes(name)
-              ? 'deleting contacts is turned off with GROOVE_ALLOW_CONTACT_DELETE=0'
-              : 'it sends email, which needs GROOVE_ALLOW_SEND=1';
+            : 'it sends email, which needs GROOVE_ALLOW_SEND=1';
         throw new Error(`${name} is disabled: ${reason}`);
       }
 
