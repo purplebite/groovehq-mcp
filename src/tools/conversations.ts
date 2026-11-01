@@ -1,6 +1,7 @@
 import { GrooveClient } from '../groove-client.js';
 import { queries, mutations } from '../utils/graphql-queries.js';
 import { Conversation } from '../types/groove.js';
+import { AgentTools } from './agents.js';
 import { DraftTools } from './drafts.js';
 import { AttachmentArg, uploadAttachments } from './attachments.js';
 
@@ -55,6 +56,9 @@ interface CreateConversationArgs {
   cc?: string[];
   bcc?: string[];
   attachments?: AttachmentArg[];
+  authorId?: string;
+  state?: 'opened' | 'closed' | 'snoozed';
+  snoozedUntil?: string;
 }
 
 interface LogConversationArgs {
@@ -69,6 +73,7 @@ interface LogConversationArgs {
   assignedTeamId?: string;
   skipNotifications?: boolean;
   attachments?: AttachmentArg[];
+  authorId?: string;
 }
 
 interface DeleteConversationArgs {
@@ -147,6 +152,11 @@ export class ConversationTools {
   }
 
   async createConversation(args: CreateConversationArgs): Promise<Conversation> {
+    if (args.snoozedUntil && args.state !== 'snoozed') {
+      throw new Error('snoozedUntil needs state snoozed');
+    }
+    if (args.authorId) await new AgentTools(this.client).checkAuthor(args.authorId);
+
     const payload = await this.client.mutate<{ conversation: Conversation }>(
       mutations.conversationCreateEmail,
       'conversationCreateEmail',
@@ -159,9 +169,12 @@ export class ConversationTools {
           cc: args.cc?.map(email => ({ email, name: email })),
           bcc: args.bcc?.map(email => ({ email, name: email })),
           attachments: await uploadAttachments(this.client, args.attachments),
+          authorId: args.authorId,
         },
         assigned: { agentId: args.assignedAgentId, teamId: args.assignedTeamId },
         tagIds: args.tagIds,
+        state: args.state?.toUpperCase(),
+        snoozeUntil: args.snoozedUntil,
       }
     );
 
@@ -170,6 +183,8 @@ export class ConversationTools {
 
   // Groove's "Log a Conversation": a new ticket that starts with a note, so no mail goes out
   async logConversation(args: LogConversationArgs) {
+    if (args.authorId) await new AgentTools(this.client).checkAuthor(args.authorId);
+
     const payload = await this.client.mutate<{ conversation: Conversation }>(
       mutations.conversationLog,
       'conversationLog',
@@ -188,6 +203,7 @@ export class ConversationTools {
             : undefined,
         state: args.state?.toUpperCase(),
         skipNotifications: args.skipNotifications,
+        authorId: args.authorId,
       }
     );
 

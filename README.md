@@ -14,7 +14,7 @@ Both repos use Groove's REST API for conversations. This one runs on GraphQL onl
 
 - `listConversations`: search and filter by keyword, state, agent, team, contact, channel, or tag
 - `getConversation`: get one ticket
-- `createConversation`: start a new ticket by sending an email
+- `createConversation`: start a new ticket by sending an email, in a chosen `state`
 - `logConversation`: Groove's Log a Conversation. Start a ticket with an internal note, for example after a phone call. It never sends mail
 - `updateConversation`: change the state, subject, contact, or mailbox, mark a ticket unread, spam, or trash, star or follow it, assign or unassign someone, or add or remove tags
 - `closeConversation`: the most satisfying one
@@ -80,7 +80,7 @@ import { createGrooveServer } from 'groovehq-mcp/server';
 const server = createGrooveServer({ token: 'your_token_here', readOnly: true });
 ```
 
-`allowSend`, `allowMerge`, `allowPermanentDelete`, and `apiUrl` are optional too. Sending and permanent deletion stay off unless you set them to `true`, merging stays on unless you set `allowMerge: false`, and `readOnly` always wins.
+`allowSend`, `allowSendAs`, `allowMerge`, `allowPermanentDelete`, and `apiUrl` are optional too. Sending, acting as a colleague, and permanent deletion stay off unless you set them to `true`, merging stays on unless you set `allowMerge: false`, and `readOnly` always wins.
 
 ## Handle with care
 
@@ -89,6 +89,7 @@ This server can send real email to real customers. A few things keep that honest
 - **Sending is off by default.** `sendMessage`, `createConversation`, `forwardConversation`, and `undoSend` only appear when you set `GROOVE_ALLOW_SEND=1`.
 - **Read-only mode.** Set `GROOVE_READ_ONLY=1` to leave out every tool that writes, including drafts.
 - **Recipients are always explicit.** `createConversation` and `sendMessage` require a `to` address, nothing is sent to a default, and `cc` and `bcc` are optional.
+- **Acting as a colleague is off by default.** Mail and notes go out as the agent who owns the API token. Set `GROOVE_ALLOW_SEND_AS=1` to pass `authorId` to `createConversation`, `sendMessage`, `createNote`, or `logConversation`. The server first checks that this agent exists and is active, because Groove can otherwise use the token owner without saying so.
 - **Attachments are checked first.** Links must use `https`, and local or private addresses are refused. Files can be up to 20 MB from a link or 5 MB as base64, with at most 25 per message.
 - **Merging is permanent.** Only the target ticket stays, with its own contact, subject, and assignee. Replies and notes move over, tags are combined, and an open ticket reopens the target. `mergeConversations` is marked as destructive, and it refuses tickets with different contacts or your own drafts on the merged ticket unless told otherwise. Set `GROOVE_ALLOW_MERGE=0` to turn off merging tickets and contacts.
 - **Deleting is limited.** A deleted ticket can always be restored, unless you set `GROOVE_ALLOW_PERMANENT_DELETE=1` and pass `permanent: true`. A deleted contact is gone for good, so contacts with tickets can't be deleted at all: merge them first with `mergeContacts`. Other contacts are only deleted with `confirm: true`, at most 100 per call.
@@ -162,7 +163,7 @@ To test contacts, add `--contacts` and set `GROOVE_TEST_TO` to an address that h
 GROOVE_API_TOKEN=your_token_here GROOVE_TEST_TO=you@example.com npm run test:live -- --contacts
 ```
 
-To test ticket changes and attachments, add `--tickets`. It asks first, then sends 4 test mails to plus addresses of `GROOVE_TEST_TO`, and changes and deletes test tickets:
+To test ticket changes and attachments, add `--tickets`. It asks first, then sends 8 test mails to plus addresses of `GROOVE_TEST_TO`, two of them as a random active agent, and changes and deletes test tickets:
 
 ```bash
 GROOVE_API_TOKEN=your_token_here GROOVE_TEST_TO=you@example.com GROOVE_TEST_CHANNEL=ch_123 npm run test:live -- --tickets

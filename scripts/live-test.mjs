@@ -17,7 +17,7 @@
 //                                                     only this: creates and deletes contacts, sends nothing
 //
 //   GROOVE_API_TOKEN=... GROOVE_TEST_TO=you@example.com GROOVE_TEST_CHANNEL=ch_123 \
-//     npm run test:live -- --tickets                  only this: sends 4 test mails, changes and deletes test tickets
+//     npm run test:live -- --tickets                  only this: sends 8 test mails, changes and deletes test tickets
 //
 //   GROOVE_API_TOKEN=... npm run test:live -- --update
 //                                                     changes a [TEST] ticket and puts it back
@@ -57,7 +57,7 @@ if (contactsOnly && !GROOVE_TEST_TO) {
 
 const server = spawn('node', [fileURLToPath(new URL('../dist/index.js', import.meta.url))], {
   stdio: ['pipe', 'pipe', 'ignore'],
-  env: { ...process.env, GROOVE_ALLOW_SEND: sends ? '1' : '0', GROOVE_ALLOW_PERMANENT_DELETE: ticketsOnly ? '1' : '0', GROOVE_READ_ONLY: '0' },
+  env: { ...process.env, GROOVE_ALLOW_SEND: sends ? '1' : '0', GROOVE_ALLOW_SEND_AS: ticketsOnly ? '1' : '0', GROOVE_ALLOW_PERMANENT_DELETE: ticketsOnly ? '1' : '0', GROOVE_READ_ONLY: '0' },
 });
 const lines = createInterface({ input: server.stdout })[Symbol.asyncIterator]();
 let nextId = 1;
@@ -118,7 +118,7 @@ if (ticketsOnly) {
   console.log('\nTickets');
   const { createInterface: prompt } = await import('node:readline/promises');
   const input = prompt({ input: process.stdin, output: process.stdout });
-  const answer = await input.question(`\nSend 4 test mails to plus addresses of ${GROOVE_TEST_TO}? Type yes: `);
+  const answer = await input.question(`\nSend 8 test mails to plus addresses of ${GROOVE_TEST_TO}? Type yes: `);
   input.close();
   if (answer !== 'yes') {
     console.log('Skipped the ticket tests.');
@@ -277,6 +277,102 @@ if (ticketsOnly) {
     });
     expect(created.counts.attachments === 1, 'file missing');
     await call('closeConversation', { id: String(created.number) });
+  });
+
+  const whoAmI = await fetch(process.env.GROOVE_API_URL || 'https://api.groovehq.com/v2/graphql', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${GROOVE_API_TOKEN}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ query: '{ me { id } }' }),
+  });
+  const me = (await whoAmI.json()).data.me.id;
+  const agents = await call('listAgents');
+  const others = agents.filter(agent => agent.state === 'ACTIVE' && agent.id !== me);
+  const author = others[Math.floor(Math.random() * others.length)];
+  const send = (name, args = {}) =>
+    call('createConversation', {
+      channelId: GROOVE_TEST_CHANNEL,
+      to: `${local}+${name}${stamp}@${domain}`,
+      subject: `[TEST] groovehq-mcp ${name}`,
+      body: 'Automated groovehq-mcp test. Feel free to ignore.',
+      ...args,
+    });
+  const firstAuthor = async number =>
+    (await call('listMessages', { conversationId: String(number) }))[0]?.author?.id;
+
+  await test('createConversation sends as a random agent and closes the ticket', async () => {
+    const created = await send('author', { authorId: author.id, state: 'closed' });
+    expect(created.state === 'CLOSED', `state is ${created.state}`);
+    expect((await firstAuthor(created.number)) === author.id, 'wrong author');
+    return `ticket ${created.number} as ${author.id}`;
+  });
+
+  await test('sendMessage, createNote and logConversation act as a random agent', async () => {
+    const lastAuthor = async number =>
+      (await call('listMessages', { conversationId: String(number) })).at(-1)?.author?.id;
+    await call('sendMessage', { conversationId: id, to: `${local}+reply${stamp}@${domain}`, body: 'Automated send as test.', authorId: author.id });
+    expect((await lastAuthor(id)) === author.id, 'wrong reply author');
+    await call('createNote', { conversationId: id, body: 'Automated send as note.', authorId: author.id });
+    expect((await lastAuthor(id)) === author.id, 'wrong note author');
+    const logged = await call('logConversation', { channelId: GROOVE_TEST_CHANNEL, to: `${local}+logas${stamp}@${domain}`, subject: '[TEST] groovehq-mcp logged as agent', body: 'Automated send as log.', state: 'closed', authorId: author.id });
+    expect((await lastAuthor(logged.ticket.number)) === author.id, 'wrong log author');
+    return `tickets ${id} and ${logged.ticket.number} as ${author.id}`;
+  });
+
+  await test('authorId is hidden and refused without GROOVE_ALLOW_SEND_AS', async () => {
+    const { createGrooveServer } = await import('../dist/server.js');
+    const { InMemoryTransport } = await import('@modelcontextprotocol/sdk/inMemory.js');
+    const { Client } = await import('@modelcontextprotocol/sdk/client/index.js');
+    const [serverSide, clientSide] = InMemoryTransport.createLinkedPair();
+    await createGrooveServer({ token: GROOVE_API_TOKEN, apiUrl: process.env.GROOVE_API_URL, allowSend: true }).connect(serverSide);
+    const client = new Client({ name: 'live-test', version: '1.0.0' });
+    await client.connect(clientSide);
+    const { tools } = await client.listTools();
+    const calls = {
+      createConversation: { channelId: GROOVE_TEST_CHANNEL, to: `${local}+sendas${stamp}@${domain}`, subject: 'x', body: 'x' },
+      sendMessage: { conversationId: id, to: `${local}+sendas${stamp}@${domain}`, body: 'x' },
+      createNote: { conversationId: id, body: 'x' },
+      logConversation: { channelId: GROOVE_TEST_CHANNEL, to: `${local}+sendas${stamp}@${domain}`, subject: 'x', body: 'x' },
+    };
+    for (const [name, args] of Object.entries(calls)) {
+      expect(!tools.find(tool => tool.name === name).inputSchema.properties.authorId, `${name} lists authorId`);
+      const reply = await client.callTool({ name, arguments: { ...args, authorId: author.id } });
+      expect(reply.content[0].text.includes('GROOVE_ALLOW_SEND_AS'), `${name} accepted authorId`);
+    }
+    await client.close();
+  });
+
+  await test('createConversation defaults to the token owner and an open ticket', async () => {
+    const created = await send('default');
+    expect(created.state === 'OPENED', `state is ${created.state}`);
+    expect((await firstAuthor(created.number)) === me, 'wrong author');
+    await call('closeConversation', { id: String(created.number) });
+    return `ticket ${created.number}`;
+  });
+
+  await test('createConversation snoozes the ticket', async () => {
+    const until = new Date(Date.now() + 86400000).toISOString();
+    const created = await send('snooze', { state: 'snoozed', snoozedUntil: until });
+    expect(created.state === 'SNOOZED', `state is ${created.state}`);
+    expect(created.snoozed?.until, 'no snooze date');
+    await call('closeConversation', { id: String(created.number) });
+    return `ticket ${created.number}`;
+  });
+
+  await test('createConversation refuses a made-up agent and a stray snooze date', async () => {
+    let madeUp;
+    do madeUp = `ag_${Math.floor(Math.random() * 1e10)}`;
+    while (agents.some(agent => agent.id === madeUp));
+    // Groove itself would send this one as the token owner
+    const refused = await fails('createConversation', { channelId: GROOVE_TEST_CHANNEL, to: `${local}+badauthor${stamp}@${domain}`, subject: 'x', body: 'x', authorId: madeUp });
+    expect(refused?.includes('Unknown agent'), 'made-up agent accepted');
+    const reply = await fails('sendMessage', { conversationId: id, to: `${local}+badreply${stamp}@${domain}`, body: 'x', authorId: madeUp });
+    expect(reply?.includes('Unknown agent'), 'made-up agent replied');
+    const note = await fails('createNote', { conversationId: id, body: 'x', authorId: madeUp });
+    expect(note?.includes('Unknown agent'), 'made-up agent wrote a note');
+    const logged = await fails('logConversation', { channelId: GROOVE_TEST_CHANNEL, to: `${local}+badlog${stamp}@${domain}`, subject: 'x', body: 'x', authorId: madeUp });
+    expect(logged?.includes('Unknown agent'), 'made-up agent logged a ticket');
+    const stray = await fails('createConversation', { channelId: GROOVE_TEST_CHANNEL, to: `${local}+badsnooze${stamp}@${domain}`, subject: 'x', body: 'x', snoozedUntil: new Date().toISOString() });
+    expect(stray?.includes('needs state snoozed'), 'snooze date accepted');
   });
 
   await test('closeConversation closes the test ticket', async () => {

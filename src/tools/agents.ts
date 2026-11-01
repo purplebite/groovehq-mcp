@@ -35,4 +35,11 @@ export class AgentTools {
     const agents = await this.listAgents();
     return agents.find(agent => agent.id === id) || null;
   }
+
+  // Groove acts as the token owner when it doesn't know the author, so check first
+  async checkAuthor(authorId: string): Promise<void> {
+    const agent = await this.getAgent(authorId);
+    if (!agent) throw new Error(`Unknown agent: ${authorId}`);
+    if (agent.state !== 'ACTIVE') throw new Error(`Agent ${authorId} is not active`);
+  }
 }

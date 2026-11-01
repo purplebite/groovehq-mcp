@@ -1,6 +1,7 @@
 import { GrooveClient } from '../groove-client.js';
 import { queries, mutations } from '../utils/graphql-queries.js';
 import { Conversation, Message } from '../types/groove.js';
+import { AgentTools } from './agents.js';
 import { AttachmentArg, uploadAttachments } from './attachments.js';
 
 interface ListMessagesArgs {
@@ -15,12 +16,14 @@ interface SendMessageArgs {
   cc?: string[];
   bcc?: string[];
   attachments?: AttachmentArg[];
+  authorId?: string;
 }
 
 interface CreateNoteArgs {
   conversationId: string;
   body: string;
   attachments?: AttachmentArg[];
+  authorId?: string;
 }
 
 export class MessageTools {
@@ -63,16 +66,29 @@ export class MessageTools {
   }
 
   async sendMessage(args: SendMessageArgs) {
+    const conversationId = await this.client.resolveConversationId(args.conversationId);
+    let channelId: string | undefined;
+    if (args.authorId) {
+      await new AgentTools(this.client).checkAuthor(args.authorId);
+      // Groove fails without saying why when another author replies without the mailbox
+      const { node } = await this.client.request<{ node: Conversation | null }>(queries.getConversation, {
+        id: conversationId,
+      });
+      channelId = node?.channel?.id;
+    }
+
     const payload = await this.client.mutate<{ conversation: Conversation; changesetId: string }>(
       mutations.conversationReply,
       'conversationReply',
       {
-        conversationId: await this.client.resolveConversationId(args.conversationId),
+        conversationId,
         to: args.to,
         body: args.body,
         cc: args.cc,
         bcc: args.bcc,
         attachments: await uploadAttachments(this.client, args.attachments),
+        authorId: args.authorId,
+        channelId,
       }
     );
 
@@ -116,6 +132,8 @@ export class MessageTools {
   }
 
   async createNote(args: CreateNoteArgs): Promise<Conversation> {
+    if (args.authorId) await new AgentTools(this.client).checkAuthor(args.authorId);
+
     const payload = await this.client.mutate<{ conversation: Conversation }>(
       mutations.conversationAddNote,
       'conversationAddNote',
@@ -123,6 +141,7 @@ export class MessageTools {
         conversationId: await this.client.resolveConversationId(args.conversationId),
         body: args.body,
         attachments: await uploadAttachments(this.client, args.attachments),
+        authorId: args.authorId,
       }
     );
 

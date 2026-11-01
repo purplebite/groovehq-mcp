@@ -23,9 +23,15 @@ export interface GrooveServerOptions {
   apiUrl?: string;
   readOnly?: boolean;
   allowSend?: boolean;
+  allowSendAs?: boolean;
   allowMerge?: boolean;
   allowPermanentDelete?: boolean;
 }
+
+const AUTHOR_SCHEMA = {
+  type: 'string',
+  description: 'ID of the agent to act as. Defaults to the agent who owns the API token',
+};
 
 const ATTACHMENTS_SCHEMA = {
   type: 'array',
@@ -70,8 +76,11 @@ export function createGrooveServer(opts: GrooveServerOptions): Server {
 
   const readOnly = opts.readOnly === true;
   const allowSend = opts.allowSend === true && !readOnly;
+  const allowSendAs = opts.allowSendAs === true && !readOnly;
   const allowMerge = opts.allowMerge !== false && !readOnly;
   const allowPermanentDelete = opts.allowPermanentDelete === true && !readOnly;
+
+  const authorField = allowSendAs ? { authorId: AUTHOR_SCHEMA } : {};
 
   function isEnabled(tool: string): boolean {
     if (SEND_TOOLS.includes(tool)) return allowSend;
@@ -94,7 +103,7 @@ export function createGrooveServer(opts: GrooveServerOptions): Server {
   const server = new Server(
     {
       name: 'groovehq-mcp',
-      version: '0.7.1',
+      version: '0.8.0',
     },
     {
       capabilities: {
@@ -219,6 +228,17 @@ export function createGrooveServer(opts: GrooveServerOptions): Server {
                 description: 'Email addresses to send a hidden copy to',
               },
               attachments: ATTACHMENTS_SCHEMA,
+              ...authorField,
+              state: {
+                type: 'string',
+                enum: ['opened', 'closed', 'snoozed'],
+                description: 'State of the new ticket',
+                default: 'opened',
+              },
+              snoozedUntil: {
+                type: 'string',
+                description: 'ISO 8601 datetime to snooze until. Needs state snoozed. Leave out to snooze indefinitely',
+              },
             },
             required: ['channelId', 'to', 'subject', 'body'],
           },
@@ -273,6 +293,7 @@ export function createGrooveServer(opts: GrooveServerOptions): Server {
                 description: 'Do not notify agents about the new ticket',
               },
               attachments: ATTACHMENTS_SCHEMA,
+              ...authorField,
             },
             required: ['channelId', 'to', 'subject', 'body'],
           },
@@ -601,6 +622,7 @@ export function createGrooveServer(opts: GrooveServerOptions): Server {
                 description: 'Email addresses to send a hidden copy to',
               },
               attachments: ATTACHMENTS_SCHEMA,
+              ...authorField,
             },
             required: ['conversationId', 'to', 'body'],
           },
@@ -620,6 +642,7 @@ export function createGrooveServer(opts: GrooveServerOptions): Server {
                 description: 'The note content',
               },
               attachments: ATTACHMENTS_SCHEMA,
+              ...authorField,
             },
             required: ['conversationId', 'body'],
           },
@@ -1084,6 +1107,10 @@ export function createGrooveServer(opts: GrooveServerOptions): Server {
             ? 'merging is turned off with GROOVE_ALLOW_MERGE=0'
             : 'it sends email, which needs GROOVE_ALLOW_SEND=1';
         throw new Error(`${name} is disabled: ${reason}`);
+      }
+
+      if (args?.authorId && !allowSendAs) {
+        throw new Error('Acting as another agent is off: it needs GROOVE_ALLOW_SEND_AS=1');
       }
 
       switch (name) {
