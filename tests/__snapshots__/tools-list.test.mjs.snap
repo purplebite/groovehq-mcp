@@ -3921,6 +3921,10 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
       "description": "Update a conversation (status, assignee, tags). Can also unassign and remove tags. To delete a ticket, use deleteConversation. To mark it as spam, use markAsSpam",
       "inputSchema": {
         "properties": {
+          "allowNoAccess": {
+            "description": "Move even though this account has no access to the mailbox, so it can't read the ticket or move it back afterwards. Only after the user agreed",
+            "type": "boolean",
+          },
           "assignedAgentId": {
             "description": "ID of agent to assign the conversation to",
             "type": "string",
@@ -3930,7 +3934,7 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
             "type": "string",
           },
           "channelId": {
-            "description": "Move the ticket to this mailbox. Refused if this account has no access to it",
+            "description": "Move the ticket to this mailbox. Refused if this account has no access to it, unless allowNoAccess is set",
             "type": "string",
           },
           "contactId": {

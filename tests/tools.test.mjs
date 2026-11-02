@@ -384,3 +384,62 @@ describe('the stdio server', () => {
     }
   }, 60000);
 });
+
+describe('moving a ticket to another mailbox', () => {
+  const move = (custom, extra = {}) => call('updateConversation', { id: '1', channelId: 'ch_2', ...extra }, ALL_ON, custom);
+  const refusal =
+    "This account has no access to mailbox ch_2, so after the move it couldn't read the ticket or move it back. " +
+    'Ask the user, then pass allowNoAccess to go ahead.';
+  const noAccess = query =>
+    /GetChannelTicket/.test(query)
+      ? { errors: [{ message: 'The selected channel is no longer available or you no longer have access. Choose another channel and try again.' }] }
+      : undefined;
+
+  test('is refused when Groove gives no access to the mailbox, and Groove is never asked to move it', async () => {
+    const result = await move(noAccess);
+    expect(result.json.error).toBe(refusal);
+    expect(result.operations).not.toContain('ConversationChangeChannel');
+  });
+
+  test('is refused when the mailbox lists a ticket this account cannot open', async () => {
+    const result = await move(query => {
+      if (/GetChannelTicket/.test(query)) return { data: { conversations: { nodes: [{ id: 'cnv_9' }] } } };
+      if (/GetTicketNode/.test(query)) return { errors: [{ message: 'Conversation is hidden due to permissions' }] };
+      return undefined;
+    });
+    expect(result.json.error).toBe(refusal);
+    expect(result.operations).not.toContain('ConversationChangeChannel');
+  });
+
+  test('goes ahead for an empty mailbox this account can list', async () => {
+    const result = await move(query => (/GetChannelTicket/.test(query) ? { data: { conversations: { nodes: [] } } } : undefined));
+    expect(result.isError).toBe(false);
+    expect(result.operations).toContain('ConversationChangeChannel');
+  });
+
+  test('passes on any other error from Groove', async () => {
+    const result = await move(query => (/GetChannelTicket/.test(query) ? { errors: [{ message: 'Something broke' }] } : undefined));
+    expect(result.json.error).toBe('GraphQL Error: Something broke');
+    expect(result.operations).not.toContain('ConversationChangeChannel');
+  });
+
+  test('allowNoAccess moves without the check, as the last step', async () => {
+    const result = await move(noAccess, { allowNoAccess: true, subject: 'New', tagIds: ['tag_1'] });
+    expect(result.isError).toBe(false);
+    expect(result.operations).not.toContain('GetChannelTicket');
+    const mutations = result.operations.filter(operation => operation.startsWith('Conversation'));
+    expect(mutations).toEqual(['ConversationSubject', 'ConversationTag', 'ConversationChangeChannel']);
+  });
+
+  test('without allowNoAccess the move keeps its place among the steps', async () => {
+    const result = await move(undefined, { subject: 'New', tagIds: ['tag_1'] });
+    const mutations = result.operations.filter(operation => operation.startsWith('Conversation'));
+    expect(mutations).toEqual(['ConversationSubject', 'ConversationChangeChannel', 'ConversationTag']);
+  });
+
+  test.each(['true', 1])('allowNoAccess %j is refused', async value => {
+    const result = await move(noAccess, { allowNoAccess: value });
+    expect(result.json.error).toBe('allowNoAccess must be true or false');
+    expect(result.operations).toEqual([]);
+  });
+});

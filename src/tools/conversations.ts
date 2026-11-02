@@ -35,6 +35,7 @@ interface UpdateConversationArgs {
   subject?: string;
   contactId?: string;
   channelId?: string;
+  allowNoAccess?: boolean;
   starred?: boolean;
   followerIds?: string[];
   removeFollowerIds?: string[];
@@ -233,7 +234,14 @@ export class ConversationTools {
     }
 
     const conversationId = await this.client.resolveConversationId(args.id);
-    if (args.channelId) await this.checkChannelAccess(args.channelId);
+    // With allowNoAccess the move goes last, because afterwards nothing here can reach the ticket
+    const moveLast = args.allowNoAccess === true;
+    if (args.channelId && !moveLast && !(await this.hasChannelAccess(args.channelId))) {
+      throw new Error(
+        `This account has no access to mailbox ${args.channelId}, so after the move it couldn't read the ticket or move it back. ` +
+          'Ask the user, then pass allowNoAccess to go ahead.'
+      );
+    }
     const applied: string[] = [];
     let conversation: Conversation | undefined;
 
@@ -282,11 +290,11 @@ export class ConversationTools {
       });
     }
 
-    if (args.channelId) {
-      await apply('mailbox', mutations.conversationChangeChannel, 'conversationChangeChannel', {
+    const move = () =>
+      apply('mailbox', mutations.conversationChangeChannel, 'conversationChangeChannel', {
         channelId: args.channelId,
       });
-    }
+    if (args.channelId && !moveLast) await move();
 
     if (args.starred === true) {
       await apply('star', mutations.conversationStar, 'conversationStar', {});
@@ -333,6 +341,8 @@ export class ConversationTools {
       await apply('tags', mutations.conversationTag, 'conversationTag', { tagIds: args.tagIds });
     }
 
+    if (args.channelId && moveLast) await move();
+
     if (!conversation) {
       throw new Error('Provide at least one change to make');
     }
@@ -340,24 +350,35 @@ export class ConversationTools {
     return conversation;
   }
 
-  // A ticket in a mailbox this account can't see can't be read or moved back
-  private async checkChannelAccess(channelId: string): Promise<void> {
-    const { conversations } = await this.client.request<{
-      conversations: { nodes: Array<{ id: string }> };
-    }>(queries.getChannelTicket, { filter: { channelId } });
-    const ticket = conversations.nodes[0];
-    if (!ticket) return;
+  // A ticket in a mailbox this account can't see can't be read or moved back, and Groove
+  // doesn't stop such a move itself, so access is checked first
+  private async hasChannelAccess(channelId: string): Promise<boolean> {
+    const reason = (error: unknown) => (error instanceof Error ? error.message : String(error));
+
+    let ticket: { id: string } | undefined;
+    try {
+      const { conversations } = await this.client.request<{
+        conversations: { nodes: Array<{ id: string }> };
+      }>(queries.getChannelTicket, { filter: { channelId } });
+      ticket = conversations.nodes[0];
+    } catch (error) {
+      // Groove refuses to list a mailbox the account can't access
+      if (/no longer have access/i.test(reason(error))) return false;
+      throw error;
+    }
+    // An empty mailbox can only be listed with access
+    if (!ticket) return true;
 
     try {
       await this.client.request(queries.getTicketNode, { id: ticket.id });
+      return true;
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      if (/hidden due to permissions/i.test(message)) {
-        throw new Error(`This account has no access to mailbox ${channelId}, so it couldn't reach the ticket after the move`);
-      }
+      if (/hidden due to permissions/i.test(reason(error))) return false;
       throw error;
     }
   }
+
+
 
   async deleteConversation(id: string) {
     await this.removeConversation(id, 'SOFT');
@@ -749,7 +770,11 @@ export const updateConversation = defineTool<UpdateConversationArgs>({
       },
       channelId: {
         type: 'string',
-        description: 'Move the ticket to this mailbox. Refused if this account has no access to it',
+        description: 'Move the ticket to this mailbox. Refused if this account has no access to it, unless allowNoAccess is set',
+      },
+      allowNoAccess: {
+        type: 'boolean',
+        description: "Move even though this account has no access to the mailbox, so it can't read the ticket or move it back afterwards. Only after the user agreed",
       },
       starred: {
         type: 'boolean',

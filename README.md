@@ -117,7 +117,7 @@ Your MCP client will usually ask before a tool runs. Every tool is labeled as re
 - **Orphans come in batches.** `listContacts` with `orphansOnly` reads at most 500 contacts per call. Call it again for more, but Groove's list isn't strictly sorted and can repeat contacts, so there's no guarantee you've seen them all.
 - **Companies come from mail domains.** Groove creates them by itself, often without a name, and a contact can have several. `updateContact` adds or removes one and keeps the others, and it also manages extra email addresses.
 - **Smart Folders follow the token.** `listFolders` shows the active Smart Folders that the agent who owns the API token can open, in sidebar order, so personal ones like Mine belong to that agent. Names can repeat, so each folder also lists its teams, mailboxes, and the team it filters on. Names with only punctuation, like `-`, are left out.
-- **Mailbox moves need access.** A ticket can't be moved to a mailbox your account can't reach, because you couldn't access the ticket afterwards.
+- **Mailbox moves check access.** Groove lets you move a ticket to a mailbox your account can't reach, but afterwards you can't read it or move it back. `updateConversation` refuses such a move unless you pass `allowNoAccess`, which a model should only do after asking.
 - **`listMessages` can show too much.** Groove can still return deleted notes, mail moved to another ticket, and undone mail as an empty message.
 
 ## Development
