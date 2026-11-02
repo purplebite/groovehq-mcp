@@ -378,8 +378,6 @@ export class ConversationTools {
     }
   }
 
-
-
   async deleteConversation(id: string) {
     await this.removeConversation(id, 'SOFT');
     return { deleted: true, ticket: id };
