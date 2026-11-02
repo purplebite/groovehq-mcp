@@ -1,6 +1,6 @@
 {
   "name": "groovehq-mcp",
-  "version": "0.11.0",
+  "version": "0.11.1",
   "description": "Working MCP server for Groove HQ, updated for the current API and tested against a live account: search and read tickets, send email replies, add notes, and manage contacts.",
   "type": "module",
   "main": "dist/index.js",
@@ -65,8 +65,7 @@
     "@eslint/js": "^10.0.1",
     "@types/node": "^20.11.0",
     "eslint": "^10.14.0",
-    "jest": "^29.7.0",
-    "ts-jest": "^29.1.2",
+    "jest": "^30.5.2",
     "typescript": "^5.3.3",
     "typescript-eslint": "^8.72.1"
   },
@@ -83,6 +82,12 @@
     "coverageReporters": [
       "text-summary",
       "text"
-    ]
+    ],
+    "coverageThreshold": {
+      "global": {
+        "lines": 85,
+        "branches": 70
+      }
+    }
   }
 }

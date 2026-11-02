@@ -56,13 +56,13 @@ export class KnowledgeBaseResources {
     return response.node && live(response.node);
   }
 
-  async searchArticles(args: SearchKbArticlesArgs): Promise<KnowledgeBaseArticle[]> {
+  async searchArticles(args: SearchKbArticlesArgs) {
     const response = await this.client.request<{
       articles: {
         nodes: KnowledgeBaseArticle[];
         pageInfo: {
           hasNextPage: boolean;
-          endCursor: string;
+          endCursor: string | null;
         };
       };
     }>(queries.listKbArticles, {
@@ -72,8 +72,9 @@ export class KnowledgeBaseResources {
       after: args.after,
     });
 
-    return response.articles.nodes.map(live);
+    return { articles: response.articles.nodes.map(live), pageInfo: response.articles.pageInfo };
   }
+
 
   // Helper method to build resource URIs
   buildResourceUri(type: 'article' | 'category', id: string): string {
@@ -101,7 +102,7 @@ export const searchKbArticles = defineTool<SearchKbArticlesArgs>({
   name: 'searchKbArticles',
   setting: 'read',
   annotations: READ_TOOL,
-  description: 'Search knowledge base articles',
+  description: 'Search knowledge base articles. Returns one page; if pageInfo.hasNextPage is true, more results exist.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -111,8 +112,12 @@ export const searchKbArticles = defineTool<SearchKbArticlesArgs>({
       },
       limit: {
         type: 'number',
-        description: 'Maximum number of articles to return',
+        description: 'Maximum number of articles to return per page',
         default: 20,
+      },
+      after: {
+        type: 'string',
+        description: 'Cursor for pagination',
       },
     },
     required: ['query'],

@@ -672,7 +672,16 @@ await test('unknown folders give a clear error', async () => {
   expect(error === 'Folder not found: fol_0000000000', 'wrong error');
 });
 
-await test('searchKbArticles', async () => `${(await call('searchKbArticles', { query: 'help' })).length} found`);
+await test('searchKbArticles returns live articles a page at a time', async () => {
+  const first = await call('searchKbArticles', { query: 'a', limit: 1 });
+  expect(Array.isArray(first.articles) && first.pageInfo, 'no articles and pageInfo');
+  expect(first.articles.every(article => ['PUBLISHED', 'WIP'].includes(article.state)), 'shows an article that is not live');
+  if (first.pageInfo.hasNextPage) {
+    const next = await call('searchKbArticles', { query: 'a', limit: 1, after: first.pageInfo.endCursor });
+    expect(!next.articles.some(article => ids(first.articles).includes(article.id)), 'pages overlap');
+  }
+  return `${first.articles.length} on the first page`;
+});
 
 await test('unknown tickets give a clear error', async () => {
   expect((await fails('getConversation', { id: '999999999' })) === 'Ticket not found: 999999999', 'wrong error');

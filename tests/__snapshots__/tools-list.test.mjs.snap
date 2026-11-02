@@ -1,4 +1,4 @@
-// Jest Snapshot v1, https://goo.gl/fbAQLP
+// Jest Snapshot v1, https://jestjs.io/docs/snapshot-testing
 
 exports[`tools/list is unchanged for all 64 option combinations 1`] = `
 {
@@ -3518,12 +3518,16 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
       "annotations": {
         "readOnlyHint": true,
       },
-      "description": "Search knowledge base articles",
+      "description": "Search knowledge base articles. Returns one page; if pageInfo.hasNextPage is true, more results exist.",
       "inputSchema": {
         "properties": {
+          "after": {
+            "description": "Cursor for pagination",
+            "type": "string",
+          },
           "limit": {
             "default": 20,
-            "description": "Maximum number of articles to return",
+            "description": "Maximum number of articles to return per page",
             "type": "number",
           },
           "query": {

@@ -137,7 +137,7 @@ const normalPaths = [
   ['updateContact', { id: 'co_1', firstName: 'B' }, 'CustomFieldValuesUpdate', r => expect(r).toBeTruthy()],
   ['listAgents', {}, 'ListAgents', r => expect(r[0].id).toBe('ag_1')],
   ['getAgent', { id: 'ag_1' }, 'ListAgents', r => expect(r.id).toBe('ag_1')],
-  ['searchKbArticles', { query: 'refund' }, 'ListKbArticles', r => expect(r[0].id).toBe('ka_1')],
+  ['searchKbArticles', { query: 'refund' }, 'ListKbArticles', r => expect(r.articles[0].id).toBe('ka_1')],
   ['listTags', {}, 'ListTags', r => expect(r[0].id).toBe('tag_1')],
   ['listTeams', {}, 'ListTeams', r => expect(r[0].id).toBe('tm_1')],
   ['listFolders', {}, 'ListFolders', r => expect(r[0].id).toBe('fo_1')],
@@ -297,6 +297,26 @@ describe('knowledge base', () => {
     expect(requests[0].variables.filter).toEqual({ keywords: 'refund', state: ['PUBLISHED', 'WIP'] });
   });
 
+  test('search returns one page with a cursor for the next', async () => {
+    const pages = (query, variables) =>
+      /ListKbArticles/.test(query)
+        ? { data: { articles: { nodes: [{ ...article, id: variables.after ? 'ka_2' : 'ka_1' }], pageInfo: { hasNextPage: !variables.after, endCursor: variables.after ? null : 'c1' } } } }
+        : undefined;
+    const first = await call('searchKbArticles', { query: 'refund', limit: 1 }, ALL_ON, pages);
+    expect(first.json).toEqual({ articles: [expect.objectContaining({ id: 'ka_1' })], pageInfo: { hasNextPage: true, endCursor: 'c1' } });
+    expect(requests[0].variables.first).toBe(1);
+    expect(requests[0].variables).not.toHaveProperty('after');
+    const second = await call('searchKbArticles', { query: 'refund', limit: 1, after: first.json.pageInfo.endCursor }, ALL_ON, pages);
+    expect(second.json).toEqual({ articles: [expect.objectContaining({ id: 'ka_2' })], pageInfo: { hasNextPage: false, endCursor: null } });
+    expect(requests[0].variables).toMatchObject({ first: 1, after: 'c1' });
+  });
+
+  test('after must be text', async () => {
+    const result = await call('searchKbArticles', { query: 'refund', after: 5 });
+    expect(result.json.error).toBe('after must be text');
+    expect(result.operations).toEqual([]);
+  });
+
   test('the resource list asks only for what the help site shows, with details in _meta', async () => {
     const c = await client();
     const { resources } = await c.listResources();
@@ -327,8 +347,8 @@ describe('knowledge base', () => {
   test('search shows the published version too', async () => {
     const changed = () => ({ data: { articles: { nodes: [{ ...article, state: 'WIP', body: 'Unpublished', currentVersion: { title: 'Article', body: 'Text' } }], pageInfo: page } } });
     const result = await call('searchKbArticles', { query: 'refund' }, ALL_ON, changed);
-    expect(result.json[0]).toMatchObject({ title: 'Article', body: 'Text' });
-    expect(result.json[0].currentVersion).toBeUndefined();
+    expect(result.json.articles[0]).toMatchObject({ title: 'Article', body: 'Text' });
+    expect(result.json.articles[0].currentVersion).toBeUndefined();
   });
 
   test.each(['DRAFT', 'DELETED'])('a %s article stays hidden', async state => {
