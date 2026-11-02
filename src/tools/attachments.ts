@@ -23,7 +23,7 @@ const MAX_REDIRECTS = 3;
 const DOWNLOAD_TIMEOUT_MS = 30000;
 
 // A URL comes from the model, so it must not reach anything on the local network.
-// This only reads the address: a public name that points to a private address gets through.
+// This reads the address itself; resolvedPrivately also checks where a name points
 function isPrivateHost(hostname: string): boolean {
   const host = hostname.toLowerCase().replace(/^\[|\]$/g, '').replace(/\.+$/, '');
 
@@ -52,10 +52,47 @@ function isPrivateHost(hostname: string): boolean {
   );
 }
 
-function checkUrl(value: string): URL {
+type Dns = typeof import('node:dns').promises;
+
+// Loaded by a name the bundler can't follow, so a build without Node's modules, like a Worker
+// without nodejs_compat, still works. There the name isn't checked, only the address
+async function loadDns(): Promise<Dns | undefined> {
+  const name = 'node:dns';
+  try {
+    const dns = await import(name);
+    return dns.promises ?? dns.default?.promises;
+  } catch {
+    return undefined;
+  }
+}
+
+async function addressesOf(dns: Dns, hostname: string, value: string): Promise<string[]> {
+  try {
+    return (await dns.lookup(hostname, { all: true, verbatim: true })).map(entry => entry.address);
+  } catch (error) {
+    // Workers have no lookup, but they can ask DNS directly
+    if (!/not implemented/i.test(error instanceof Error ? error.message : '')) {
+      throw new Error(`Attachment URL can't be resolved: ${value}`);
+    }
+  }
+  const results = await Promise.allSettled([dns.resolve4(hostname), dns.resolve6(hostname)]);
+  const addresses = results.flatMap(result => (result.status === 'fulfilled' ? result.value : []));
+  if (!addresses.length) throw new Error(`Attachment URL can't be resolved: ${value}`);
+  return addresses;
+}
+
+// Every address counts, because the download may use any of them. The name is looked up again
+// for the download itself, so a name that changes in between (DNS rebinding) isn't caught
+async function checkUrl(value: string): Promise<URL> {
   const url = new URL(value);
   if (url.protocol !== 'https:') throw new Error(`Attachment URL must use https: ${value}`);
   if (isPrivateHost(url.hostname)) throw new Error(`Attachment URL is not allowed: ${value}`);
+
+  const dns = await loadDns();
+  const hostname = url.hostname.replace(/^\[|\]$/g, '');
+  if (dns && (await addressesOf(dns, hostname, value)).some(isPrivateHost)) {
+    throw new Error(`Attachment URL is not allowed: ${value}`);
+  }
   return url;
 }
 
@@ -88,7 +125,7 @@ async function readBody(response: Response, value: string): Promise<Uint8Array> 
 }
 
 async function download(value: string): Promise<{ bytes: Uint8Array; contentType?: string }> {
-  let url = checkUrl(value);
+  let url = await checkUrl(value);
 
   for (let hops = 0; hops <= MAX_REDIRECTS; hops++) {
     const response = await fetch(url, {
@@ -99,7 +136,7 @@ async function download(value: string): Promise<{ bytes: Uint8Array; contentType
     if (response.status >= 300 && response.status < 400) {
       const location = response.headers.get('location');
       if (!location) throw new Error(`Attachment URL redirected nowhere: ${value}`);
-      url = checkUrl(new URL(location, url).toString());
+      url = await checkUrl(new URL(location, url).toString());
       continue;
     }
 

@@ -1,4 +1,5 @@
 import http from 'node:http';
+import dns from 'node:dns';
 import { spawn } from 'node:child_process';
 import { afterAll, beforeAll, describe, expect, test } from '@jest/globals';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
@@ -9,6 +10,16 @@ import { uploadAttachments } from '../dist/tools/attachments.js';
 const TOKEN = 'test-token';
 const page = { hasNextPage: false, endCursor: null };
 const contact = { id: 'co_1', email: 'a@example.com', name: 'A', conversationCount: 0, createdAt: '2020-01-01T00:00:00Z' };
+
+// Names resolve offline: to a public address, unless a test sets something else in resolved
+const realDns = { ...dns.promises };
+let resolved = {};
+dns.promises.lookup = async name => {
+  const addresses = resolved[name] ?? ['93.184.216.34'];
+  if (addresses instanceof Error) throw addresses;
+  return addresses.map(address => ({ address, family: address.includes(':') ? 6 : 4 }));
+};
+afterAll(() => Object.assign(dns.promises, realDns));
 
 // A stand-in for Groove that records what reaches it. Nothing here uses the network
 let requests = [];
@@ -610,5 +621,97 @@ describe('attachment links and sizes', () => {
     await expect(attempt(null, { contentBase64: huge })).rejects.toThrow('larger than 20 MB');
     globalThis.atob = atobSpy;
     expect(decoded).toBe(false);
+  });
+});
+
+describe('attachment links by where their name points', () => {
+  const client = { request: () => { throw new Error('reached upload'); } };
+  const attempt = target => uploadAttachments(client, [{ fileName: 'a', url: target }]);
+  const realFetch = globalThis.fetch;
+  let fetched;
+
+  beforeAll(() => {
+    globalThis.fetch = target => {
+      fetched.push(String(target));
+      if (String(target).startsWith('https://redirect.example')) {
+        return Promise.resolve(new Response(null, { status: 302, headers: { location: 'https://inside.example/x' } }));
+      }
+      return Promise.reject(new Error('no network in tests'));
+    };
+  });
+  afterAll(() => {
+    globalThis.fetch = realFetch;
+    resolved = {};
+    dns.promises.resolve4 = realDns.resolve4;
+    dns.promises.resolve6 = realDns.resolve6;
+  });
+
+  test.each([
+    ['localhost', ['127.0.0.1']],
+    ['a private network', ['10.1.2.3']],
+    ['cloud metadata', ['169.254.169.254']],
+    ['IPv6 loopback', ['::1']],
+    ['IPv4 inside IPv6', ['::ffff:127.0.0.1']],
+    ['one private address among public ones', ['93.184.216.34', '192.168.1.10']],
+  ])('a name that points to %s is refused', async (_, addresses) => {
+    fetched = [];
+    resolved = { 'sneaky.example': addresses };
+    await expect(attempt('https://sneaky.example/a')).rejects.toThrow('not allowed');
+    expect(fetched).toEqual([]);
+  });
+
+  test('a name that points to public addresses is tried', async () => {
+    fetched = [];
+    resolved = { 'public.example': ['93.184.216.34', '2606:2800:220:1::1'] };
+    await expect(attempt('https://public.example/a')).rejects.toThrow('no network');
+    expect(fetched).toHaveLength(1);
+  });
+
+  test('a name that does not resolve is refused', async () => {
+    fetched = [];
+    resolved = { 'missing.example': Object.assign(new Error('getaddrinfo ENOTFOUND'), { code: 'ENOTFOUND' }) };
+    await expect(attempt('https://missing.example/a')).rejects.toThrow("can't be resolved");
+    expect(fetched).toEqual([]);
+  });
+
+  test('a redirect to a name that points inside is refused', async () => {
+    fetched = [];
+    resolved = { 'inside.example': ['10.0.0.1'] };
+    await expect(attempt('https://redirect.example/a')).rejects.toThrow('not allowed: https://inside.example/x');
+    expect(fetched).toEqual(['https://redirect.example/a']);
+  });
+
+  describe('without lookup, as in a Worker', () => {
+    const lookup = dns.promises.lookup;
+    beforeAll(() => {
+      dns.promises.lookup = async () => { throw new Error('Not implemented'); };
+    });
+    afterAll(() => {
+      dns.promises.lookup = lookup;
+    });
+
+    test('DNS is asked directly and a private answer is refused', async () => {
+      fetched = [];
+      dns.promises.resolve4 = async () => ['10.0.0.1'];
+      dns.promises.resolve6 = async () => { throw Object.assign(new Error('queryAaaa ENODATA'), { code: 'ENODATA' }); };
+      await expect(attempt('https://worker.example/a')).rejects.toThrow('not allowed');
+      expect(fetched).toEqual([]);
+    });
+
+    test('a public answer is tried', async () => {
+      fetched = [];
+      dns.promises.resolve4 = async () => ['93.184.216.34'];
+      dns.promises.resolve6 = async () => ['2606:2800:220:1::1'];
+      await expect(attempt('https://worker.example/a')).rejects.toThrow('no network');
+      expect(fetched).toHaveLength(1);
+    });
+
+    test('no answer at all is refused', async () => {
+      fetched = [];
+      dns.promises.resolve4 = async () => { throw new Error('queryA ENOTFOUND'); };
+      dns.promises.resolve6 = async () => { throw new Error('queryAaaa ENOTFOUND'); };
+      await expect(attempt('https://worker.example/a')).rejects.toThrow("can't be resolved");
+      expect(fetched).toEqual([]);
+    });
   });
 });
