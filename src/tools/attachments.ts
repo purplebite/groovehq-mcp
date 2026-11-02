@@ -18,32 +18,37 @@ interface UploadRequest {
 }
 
 const MAX_FILE_BYTES = 20 * 1024 * 1024;
-const MAX_BASE64_BYTES = 5 * 1024 * 1024;
 const MAX_FILES = 25;
 const MAX_REDIRECTS = 3;
 const DOWNLOAD_TIMEOUT_MS = 30000;
 
-// A URL comes from the model, so it must not reach anything on the local network
+// A URL comes from the model, so it must not reach anything on the local network.
+// This only reads the address: a public name that points to a private address gets through.
 function isPrivateHost(hostname: string): boolean {
-  const host = hostname.toLowerCase().replace(/^\[|\]$/g, '');
+  const host = hostname.toLowerCase().replace(/^\[|\]$/g, '').replace(/\.+$/, '');
 
   if (host === 'localhost' || host.endsWith('.localhost') || host.endsWith('.local')) return true;
   if (host.endsWith('.internal')) return true;
   if (host.includes(':')) {
-    return host === '::1' || host === '::' || /^(fc|fd|fe8|fe9|fea|feb)/.test(host) || host.startsWith('::ffff:');
+    // Only global unicast addresses. 2002: wraps an IPv4 address, 2001:db8: is for documentation
+    return !/^[23][0-9a-f]{0,3}:/.test(host) || host.startsWith('2002:') || host.startsWith('2001:db8:');
   }
+  if (!host.includes('.')) return true;
 
   const parts = host.split('.').map(Number);
   if (parts.length !== 4 || parts.some(part => !Number.isInteger(part))) return false;
-  const [a, b] = parts;
+  const [a, b, c] = parts;
   return (
     a === 0 ||
     a === 10 ||
     a === 127 ||
+    a >= 224 ||
     (a === 100 && b >= 64 && b <= 127) ||
     (a === 169 && b === 254) ||
     (a === 172 && b >= 16 && b <= 31) ||
-    (a === 192 && b === 168)
+    (a === 192 && b === 0 && c === 0) ||
+    (a === 192 && b === 168) ||
+    (a === 198 && (b === 18 || b === 19))
   );
 }
 
@@ -52,6 +57,34 @@ function checkUrl(value: string): URL {
   if (url.protocol !== 'https:') throw new Error(`Attachment URL must use https: ${value}`);
   if (isPrivateHost(url.hostname)) throw new Error(`Attachment URL is not allowed: ${value}`);
   return url;
+}
+
+// The content-length header is optional, so the limit is applied while reading
+async function readBody(response: Response, value: string): Promise<Uint8Array> {
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+
+  if (response.body) {
+    const reader = response.body.getReader();
+    while (true) {
+      const { done, value: chunk } = await reader.read();
+      if (done) break;
+      size += chunk.length;
+      if (size > MAX_FILE_BYTES) {
+        await reader.cancel();
+        throw new Error(`Attachment is larger than 20 MB: ${value}`);
+      }
+      chunks.push(chunk);
+    }
+  }
+
+  const bytes = new Uint8Array(size);
+  let offset = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.length;
+  }
+  return bytes;
 }
 
 async function download(value: string): Promise<{ bytes: Uint8Array; contentType?: string }> {
@@ -76,7 +109,7 @@ async function download(value: string): Promise<{ bytes: Uint8Array; contentType
     }
 
     return {
-      bytes: new Uint8Array(await response.arrayBuffer()),
+      bytes: await readBody(response, value),
       contentType: response.headers.get('content-type')?.split(';')[0] || undefined,
     };
   }
@@ -84,8 +117,11 @@ async function download(value: string): Promise<{ bytes: Uint8Array; contentType
   throw new Error(`Too many redirects: ${value}`);
 }
 
-function decodeBase64(value: string): Uint8Array {
-  const binary = atob(value.replace(/\s/g, ''));
+function decodeBase64(value: string, fileName: string): Uint8Array {
+  const base64 = value.replace(/\s/g, '');
+  if ((base64.length * 3) / 4 - 2 > MAX_FILE_BYTES) throw new Error(`${fileName} is larger than 20 MB`);
+
+  const binary = atob(base64);
   return Uint8Array.from(binary, char => char.charCodeAt(0));
 }
 
@@ -96,11 +132,7 @@ async function load(attachment: AttachmentArg) {
 
   if (attachment.url) return download(attachment.url);
 
-  const bytes = decodeBase64(attachment.contentBase64 as string);
-  if (bytes.length > MAX_BASE64_BYTES) {
-    throw new Error(`Base64 attachments are limited to 5 MB, use a url for ${attachment.fileName}`);
-  }
-  return { bytes, contentType: undefined };
+  return { bytes: decodeBase64(attachment.contentBase64 as string, attachment.fileName), contentType: undefined };
 }
 
 async function upload(client: GrooveClient, attachment: AttachmentArg) {

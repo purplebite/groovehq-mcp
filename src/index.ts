@@ -10,14 +10,26 @@ if (!apiToken) {
   process.exit(1);
 }
 
+// Refuses anything else, because GROOVE_READ_ONLY=true must not start a server that writes
+function flag(name: string, fallback: boolean): boolean {
+  const value = process.env[name];
+  if (!value) return fallback;
+  if (value === '1') return true;
+  if (value === '0') return false;
+
+  console.error(`Error: ${name} must be 1 or 0, got "${value}"`);
+  process.exit(1);
+}
+
 const server = createGrooveServer({
   token: apiToken,
   apiUrl,
-  readOnly: process.env.GROOVE_READ_ONLY === '1',
-  allowSend: process.env.GROOVE_ALLOW_SEND === '1',
-  allowSendAs: process.env.GROOVE_ALLOW_SEND_AS === '1',
-  allowMerge: process.env.GROOVE_ALLOW_MERGE !== '0',
-  allowPermanentDelete: process.env.GROOVE_ALLOW_PERMANENT_DELETE === '1',
+  readOnly: flag('GROOVE_READ_ONLY', false),
+  allowSend: flag('GROOVE_ALLOW_SEND', false),
+  allowSendAs: flag('GROOVE_ALLOW_SEND_AS', false),
+  allowMerge: flag('GROOVE_ALLOW_MERGE', true),
+  allowPermanentDelete: flag('GROOVE_ALLOW_PERMANENT_DELETE', false),
+  allowAttachments: flag('GROOVE_ALLOW_ATTACHMENTS', false),
 });
 const grooveClient = new GrooveClient(apiToken, apiUrl);
 

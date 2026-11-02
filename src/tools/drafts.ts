@@ -1,5 +1,6 @@
 import { GrooveClient } from '../groove-client.js';
 import { queries, mutations } from '../utils/graphql-queries.js';
+import { pageGuard } from '../utils/paging.js';
 import { Draft } from '../types/groove.js';
 
 interface ListDraftsArgs {
@@ -65,6 +66,7 @@ export class DraftTools {
     const drafts: Draft[] = [];
     let after: string | undefined;
     let hasNextPage = true;
+    const nextPage = pageGuard('drafts');
 
     while (hasNextPage) {
       const response = await this.client.request<{
@@ -83,7 +85,7 @@ export class DraftTools {
 
       drafts.push(...response.drafts.nodes);
       hasNextPage = response.drafts.pageInfo.hasNextPage;
-      after = response.drafts.pageInfo.endCursor;
+      if (hasNextPage) after = nextPage(response.drafts.pageInfo.endCursor);
     }
 
     // Groove ignores a filter it can't parse and returns every draft

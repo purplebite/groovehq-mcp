@@ -16,11 +16,13 @@ Both repos use Groove's REST API for conversations. This one runs on GraphQL onl
 - `getConversation`: get one ticket
 - `createConversation`: start a new ticket by sending an email, in a chosen `state`
 - `logConversation`: Groove's Log a Conversation. Start a ticket with an internal note, for example after a phone call. It never sends mail
-- `updateConversation`: change the state, subject, contact, or mailbox, mark a ticket unread, spam, or trash, star or follow it, assign or unassign someone, or add or remove tags
+- `updateConversation`: change the state, subject, contact, or mailbox, mark a ticket unread, star or follow it, assign or unassign someone, or add or remove tags
 - `closeConversation`: the most satisfying one
 - `mergeConversations`: merge one ticket into another. This can't be undone
 - `forwardConversation`: forward a ticket by email. The ticket stays as it was
 - `deleteConversation`, `restoreConversation`: delete a ticket and bring it back
+- `deleteConversationPermanently`: delete a ticket for good
+- `markAsSpam`: mark a ticket as spam
 
 **Messages**
 
@@ -29,7 +31,7 @@ Both repos use Groove's REST API for conversations. This one runs on GraphQL onl
 - `undoSend`: cancel a mail right after sending it
 - `createNote`: leave an internal note
 - `editNote`, `reactToNote`, `deleteNote`: change, react to, or remove an internal note
-- Attach files to mail, notes, and logged tickets with `attachments`, from a public `https` link or as base64
+- Attach files to mail, notes, and logged tickets with `attachments`, from a public `https` link or as base64. Off by default
 - `createReplyDraft`: save a reply or note as a draft for someone to review. It never sends
 - `listDrafts`, `deleteDraft`: see and remove your own drafts
 
@@ -81,7 +83,7 @@ import { createGrooveServer } from 'groovehq-mcp/server';
 const server = createGrooveServer({ token: 'your_token_here', readOnly: true });
 ```
 
-`allowSend`, `allowSendAs`, `allowMerge`, `allowPermanentDelete`, and `apiUrl` are optional too. Sending, acting as a colleague, and permanent deletion stay off unless you set them to `true`, merging stays on unless you set `allowMerge: false`, and `readOnly` always wins.
+`allowSend`, `allowSendAs`, `allowMerge`, `allowPermanentDelete`, `allowAttachments`, and `apiUrl` are optional too. Sending, acting as a colleague, permanent deletion, and attachments stay off unless you set them to `true`, merging stays on unless you set `allowMerge: false`, and `readOnly` always wins. These options must be real booleans: anything else, like the string `'true'`, throws an error.
 
 The library doesn't read the `GROOVE_` settings, so pass each option yourself. It also has no login, so a hosted server has two options: keep one token on the server and put your own authentication in front of it, or have each user send their own Groove API key and pass that to `createGrooveServer`.
 
@@ -91,11 +93,14 @@ This server can send real email to real customers. A few things keep that honest
 
 - **Sending is off by default.** `sendMessage`, `createConversation`, `forwardConversation`, and `undoSend` only appear when you set `GROOVE_ALLOW_SEND=1`.
 - **Read-only mode.** Set `GROOVE_READ_ONLY=1` to leave out every tool that writes, including drafts.
+- **Settings are strict.** The `GROOVE_` settings take only `1` or `0`. Anything else, like `true`, stops the server at startup, so a typo can't leave a safety setting off.
 - **Recipients are always explicit.** `createConversation` and `sendMessage` require a `to` address, nothing is sent to a default, and `cc` and `bcc` are optional.
 - **Acting as a colleague is off by default.** Mail and notes go out as the agent who owns the API token. Set `GROOVE_ALLOW_SEND_AS=1` to pass `authorId` to `createConversation`, `sendMessage`, `createNote`, or `logConversation`. The server first checks that this agent exists and is active, because Groove can otherwise use the token owner without saying so.
-- **Attachments are checked first.** Links must use `https`, and local or private addresses are refused. Files can be up to 20 MB from a link or 5 MB as base64, with at most 25 per message.
+- **Attachments are off by default.** Set `GROOVE_ALLOW_ATTACHMENTS=1` to attach files from a link or as base64, up to 20 MB each and at most 25 per message. Base64 goes through the model, so it suits small files.
+- **Links carry a risk.** The server fetches links itself, so a model misled by a customer email could put ticket data in a link and send it to an outside server. Links must use `https`, and local or private addresses are refused. Only the address itself is checked, so a public name that points to a private address is not caught.
+- **Spam reaches past one ticket.** Groove blacklists the sender of a ticket marked as spam, so their future mail to any mailbox is marked as spam too. That's why `markAsSpam` is a separate tool marked as destructive. `restoreConversation` brings the ticket back, but the sender stays blacklisted until you remove the address in Groove's settings.
 - **Merging is permanent.** Only the target ticket stays, with its own contact, subject, and assignee. Replies and notes move over, tags are combined, and an open ticket reopens the target. `mergeConversations` is marked as destructive, and it refuses tickets with different contacts or your own drafts on the merged ticket unless told otherwise. Set `GROOVE_ALLOW_MERGE=0` to turn off merging tickets and contacts.
-- **Deleting is limited.** A deleted ticket can always be restored, unless you set `GROOVE_ALLOW_PERMANENT_DELETE=1` and pass `permanent: true`. A deleted contact is gone for good, so contacts with tickets can't be deleted at all: merge them first with `mergeContacts`. Other contacts are only deleted with `confirm: true`, at most 100 per call.
+- **Deleting is limited.** A deleted ticket can always be restored. Deleting one for good takes a separate tool, `deleteConversationPermanently`, which is marked as destructive and only appears when you set `GROOVE_ALLOW_PERMANENT_DELETE=1`. A deleted contact is gone for good, so contacts with tickets can't be deleted at all: merge them first with `mergeContacts`. Other contacts are only deleted with `confirm: true`, at most 100 per call.
 - **Failed updates tell you what happened.** Groove has no all-or-nothing update, so `updateConversation` can succeed halfway. When it does, the error says which steps already went through.
 
 Sending a draft from Groove may close the ticket, depending on your Groove settings.

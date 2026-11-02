@@ -1,5 +1,6 @@
 import { GrooveClient } from '../groove-client.js';
 import { queries } from '../utils/graphql-queries.js';
+import { pageGuard } from '../utils/paging.js';
 import { Team } from '../types/groove.js';
 
 export class TeamTools {
@@ -9,6 +10,7 @@ export class TeamTools {
     const teams: Team[] = [];
     let after: string | undefined;
     let hasNextPage = true;
+    const nextPage = pageGuard('teams');
 
     while (hasNextPage) {
       const response = await this.client.request<{
@@ -23,7 +25,7 @@ export class TeamTools {
 
       teams.push(...response.teams.nodes);
       hasNextPage = response.teams.pageInfo.hasNextPage;
-      after = response.teams.pageInfo.endCursor;
+      if (hasNextPage) after = nextPage(response.teams.pageInfo.endCursor);
     }
 
     return teams;

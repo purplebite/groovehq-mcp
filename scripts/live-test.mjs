@@ -57,7 +57,7 @@ if (contactsOnly && !GROOVE_TEST_TO) {
 
 const server = spawn('node', [fileURLToPath(new URL('../dist/index.js', import.meta.url))], {
   stdio: ['pipe', 'pipe', 'ignore'],
-  env: { ...process.env, GROOVE_ALLOW_SEND: sends ? '1' : '0', GROOVE_ALLOW_SEND_AS: ticketsOnly ? '1' : '0', GROOVE_ALLOW_PERMANENT_DELETE: ticketsOnly ? '1' : '0', GROOVE_READ_ONLY: '0' },
+  env: { ...process.env, GROOVE_ALLOW_SEND: sends ? '1' : '0', GROOVE_ALLOW_SEND_AS: ticketsOnly ? '1' : '0', GROOVE_ALLOW_PERMANENT_DELETE: ticketsOnly ? '1' : '0', GROOVE_ALLOW_ATTACHMENTS: ticketsOnly ? '1' : '0', GROOVE_READ_ONLY: '0' },
 });
 const lines = createInterface({ input: server.stdout })[Symbol.asyncIterator]();
 let nextId = 1;
@@ -160,11 +160,11 @@ if (ticketsOnly) {
     await call('deleteContacts', { contactIds: [other.id], confirm: true });
   });
 
-  await test('spam, trash and restore change the state', async () => {
-    expect((await call('updateConversation', { id, state: 'spam' })).state === 'SPAM', 'not spam');
-    expect((await call('restoreConversation', { id, state: 'opened' })).state === 'OPENED', 'not restored');
-    await call('updateConversation', { id, state: 'trashed' });
-    expect((await read()).state !== 'OPENED', 'not trashed');
+  await test('spam, delete and restore change the state', async () => {
+    expect((await call('markAsSpam', { id })).state === 'SPAM', 'not spam');
+    expect((await call('restoreConversation', { id })).state === 'OPENED', 'not restored');
+    await call('deleteConversation', { id });
+    expect((await read()).state !== 'OPENED', 'not deleted');
     expect((await call('restoreConversation', { id })).state === 'OPENED', 'not restored');
   });
 
@@ -199,7 +199,7 @@ if (ticketsOnly) {
     const otherId = String(other.number);
     expect((await call('deleteConversation', { id: otherId })).deleted, 'not deleted');
     expect((await call('restoreConversation', { id: otherId })).state === 'OPENED', 'not restored');
-    expect((await call('deleteConversation', { id: otherId, permanent: true })).permanent, 'not permanent');
+    expect((await call('deleteConversationPermanently', { id: otherId })).permanent, 'not permanent');
     expect(await fails('getConversation', { id: otherId }), 'still there');
   });
 
@@ -239,7 +239,7 @@ if (ticketsOnly) {
     }
     expect(await fails('createNote', { conversationId: id, body: 'x', attachments: [{ fileName: 'x.txt' }] }), 'no content allowed');
     expect(await fails('createNote', { conversationId: id, body: 'x', attachments: [{ ...file, url: 'https://example.com/x' }] }), 'both allowed');
-    const tooBig = Buffer.alloc(5 * 1024 * 1024 + 1).toString('base64');
+    const tooBig = Buffer.alloc(20 * 1024 * 1024 + 1).toString('base64');
     expect(await fails('createNote', { conversationId: id, body: 'x', attachments: [{ fileName: 'big.bin', contentBase64: tooBig }] }), 'too big allowed');
     expect((await read()).counts.notes === notes, 'a note was added');
   });

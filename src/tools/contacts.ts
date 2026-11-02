@@ -425,10 +425,10 @@ export class ContactTools {
     }
 
     const [contact] = matches;
-    if (contact.conversationCount) throw new Error(this.hasTickets(contact));
+    if (contact.conversationCount !== 0) throw new Error(this.hasTickets(contact));
 
     const details = { id: contact.id, email: contact.email, name: contact.name };
-    if (!args.confirm) {
+    if (args.confirm !== true) {
       return { found: true, deleted: false, wouldDelete: details, warning: SENDER_WARNING };
     }
 
@@ -467,7 +467,7 @@ export class ContactTools {
       const contact = await this.withRetry(() => this.getContact(id));
       if (!contact?.id) return { id, status: 'skipped', reason: 'Contact not found' };
       const { email, name } = contact;
-      if (contact.conversationCount) {
+      if (contact.conversationCount !== 0) {
         return { id, status: 'skipped', email, reason: this.hasTickets(contact) };
       }
       if (!confirm) return { id, status: 'would delete', email, name };
@@ -499,7 +499,11 @@ export class ContactTools {
     await this.client.mutate(mutations.contactDelete, 'contactDelete', { contactId });
   }
 
+  // Any answer but 0 keeps the contact, also when Groove leaves the count out
   private hasTickets(contact: Contact): string {
+    if (typeof contact.conversationCount !== 'number') {
+      return `${contact.email} cannot be deleted: Groove gave no ticket count.`;
+    }
     return (
       `${contact.email} has ${contact.conversationCount} ticket(s) and cannot be deleted. ` +
       'Move them first with mergeContacts.'

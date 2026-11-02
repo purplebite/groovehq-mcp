@@ -4,6 +4,7 @@ import { Conversation } from '../types/groove.js';
 import { AgentTools } from './agents.js';
 import { DraftTools } from './drafts.js';
 import { AttachmentArg, uploadAttachments } from './attachments.js';
+import { pageGuard } from '../utils/paging.js';
 
 interface ListConversationsArgs {
   state?: 'unread' | 'opened' | 'closed' | 'snoozed';
@@ -28,7 +29,7 @@ interface ListConversationsResult {
 
 interface UpdateConversationArgs {
   id: string;
-  state?: 'opened' | 'closed' | 'snoozed' | 'unread' | 'spam' | 'trashed';
+  state?: 'opened' | 'closed' | 'snoozed' | 'unread';
   subject?: string;
   contactId?: string;
   channelId?: string;
@@ -77,15 +78,8 @@ interface LogConversationArgs {
   authorId?: string;
 }
 
-interface DeleteConversationArgs {
-  id: string;
-  permanent?: boolean;
-}
-
-interface RestoreConversationArgs {
-  id: string;
-  state?: 'unread' | 'opened' | 'closed' | 'spam';
-}
+// The states Groove can restore a ticket to, without spam
+const RESTORE_STATES = ['UNREAD', 'OPENED', 'CLOSED'];
 
 interface ForwardConversationArgs {
   conversationId: string;
@@ -221,6 +215,9 @@ export class ConversationTools {
   }
 
   async updateConversation(args: UpdateConversationArgs): Promise<Conversation> {
+    const state = (args.state as string | undefined)?.toLowerCase();
+    if (state === 'spam') throw new Error('Use markAsSpam to mark a ticket as spam');
+    if (state === 'trashed') throw new Error('Use deleteConversation to delete a ticket');
     if (args.removeTagIds?.some(tagId => args.tagIds?.includes(tagId))) {
       throw new Error('A tag cannot be in both tagIds and removeTagIds');
     }
@@ -261,10 +258,6 @@ export class ConversationTools {
 
     if (args.state === 'unread') {
       await apply('state', mutations.conversationUnread, 'conversationUnread', {});
-    } else if (args.state === 'spam') {
-      await apply('state', mutations.conversationSpam, 'conversationSpam', {});
-    } else if (args.state === 'trashed') {
-      await apply('state', mutations.conversationTrash, 'conversationTrash', {});
     }
 
     if (args.subject !== undefined) {
@@ -356,24 +349,72 @@ export class ConversationTools {
     }
   }
 
-  async deleteConversation(args: DeleteConversationArgs) {
-    const conversationId = await this.client.resolveConversationId(args.id);
-    await this.client.mutate(mutations.conversationDelete, 'conversationDelete', {
-      conversationIds: [conversationId],
-      deleteMode: args.permanent ? 'HARD' : 'SOFT',
-    });
-
-    return { deleted: true, permanent: args.permanent === true, ticket: args.id };
+  async deleteConversation(id: string) {
+    await this.removeConversation(id, 'SOFT');
+    return { deleted: true, ticket: id };
   }
 
-  async restoreConversation(args: RestoreConversationArgs) {
-    const conversationId = await this.client.resolveConversationId(args.id);
+  async deleteConversationPermanently(id: string) {
+    await this.removeConversation(id, 'HARD');
+    return { deleted: true, permanent: true, ticket: id };
+  }
+
+  private async removeConversation(id: string, deleteMode: 'SOFT' | 'HARD'): Promise<void> {
+    await this.client.mutate(mutations.conversationDelete, 'conversationDelete', {
+      conversationIds: [await this.client.resolveConversationId(id)],
+      deleteMode,
+    });
+  }
+
+  // Spam reaches past this ticket, so it only goes through markAsSpam
+  async markAsSpam(id: string): Promise<Conversation> {
+    const payload = await this.client.mutate<{ conversation: Conversation }>(
+      mutations.conversationSpam,
+      'conversationSpam',
+      { conversationId: await this.client.resolveConversationId(id) }
+    );
+
+    return payload.conversation;
+  }
+
+  async restoreConversation(id: string) {
+    const conversationId = await this.client.resolveConversationId(id);
     await this.client.mutate(mutations.conversationRestore, 'conversationRestore', {
       conversationIds: [conversationId],
-      newState: (args.state ?? 'opened').toUpperCase(),
+      newState: await this.stateBeforeRemoval(conversationId),
     });
 
     return this.getConversation(conversationId);
+  }
+
+  // Groove wants a state to restore to, and only the ticket's history shows what it was
+  private async stateBeforeRemoval(conversationId: string): Promise<string> {
+    const changes: Array<{ createdAt: string; to: string }> = [];
+    const nextPage = pageGuard('state changes');
+    let after: string | undefined;
+    let hasNextPage = true;
+
+    while (hasNextPage) {
+      const { events } = await this.client.request<{
+        events: {
+          nodes: Array<{ createdAt: string; change: { to?: string } | null }>;
+          pageInfo: { hasNextPage: boolean; endCursor: string };
+        };
+      }>(queries.listStateChanges, {
+        filter: { conversationId, eventType: ['STATE_CHANGED'] },
+        first: 50,
+        after,
+      });
+
+      for (const event of events.nodes) {
+        if (event.change?.to) changes.push({ createdAt: event.createdAt, to: event.change.to });
+      }
+      hasNextPage = events.pageInfo.hasNextPage;
+      if (hasNextPage) after = nextPage(events.pageInfo.endCursor);
+    }
+
+    changes.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+    return changes.find(change => RESTORE_STATES.includes(change.to))?.to ?? 'OPENED';
   }
 
   async forwardConversation(args: ForwardConversationArgs) {
@@ -409,7 +450,7 @@ export class ConversationTools {
     const source = await this.mergeTicket(sourceId);
     const target = await this.mergeTicket(targetId);
 
-    if (!args.allowDifferentContacts && source.contact?.id !== target.contact?.id) {
+    if (args.allowDifferentContacts !== true && source.contact?.id !== target.contact?.id) {
       throw new Error(
         `Ticket #${source.number} is from ${source.contact?.email} and #${target.number} from ${target.contact?.email}. ` +
           `After a merge the conversation only shows under ${target.contact?.email}. ` +
@@ -419,7 +460,7 @@ export class ConversationTools {
 
     // Groove deletes the drafts on the source, and only the token owner's are visible here
     const drafts = await this.drafts.listDrafts({ conversationId: sourceId });
-    if (drafts.length && !args.discardDrafts) {
+    if (drafts.length && args.discardDrafts !== true) {
       throw new Error(
         `Ticket #${source.number} has ${drafts.length} unsent draft(s), and a merge deletes them. ` +
           'Ask the user, then pass discardDrafts to go ahead.'

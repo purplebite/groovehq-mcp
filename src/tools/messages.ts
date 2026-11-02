@@ -1,5 +1,6 @@
 import { GrooveClient } from '../groove-client.js';
 import { queries, mutations } from '../utils/graphql-queries.js';
+import { pageGuard } from '../utils/paging.js';
 import { Conversation, Message } from '../types/groove.js';
 import { AgentTools } from './agents.js';
 import { AttachmentArg, uploadAttachments } from './attachments.js';
@@ -34,6 +35,7 @@ export class MessageTools {
     const messages: Message[] = [];
     let after: string | undefined;
     let hasNextPage = true;
+    const nextPage = pageGuard('messages');
 
     // Events list every message, unlike event groups, which show one per group
     while (hasNextPage) {
@@ -57,7 +59,7 @@ export class MessageTools {
       }
 
       hasNextPage = response.events.pageInfo.hasNextPage;
-      after = response.events.pageInfo.endCursor;
+      if (hasNextPage) after = nextPage(response.events.pageInfo.endCursor);
     }
 
     messages.sort((a, b) => a.createdAt.localeCompare(b.createdAt));

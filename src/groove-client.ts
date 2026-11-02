@@ -4,12 +4,14 @@ import { queries } from './utils/graphql-queries.js';
 
 export class GrooveClient {
   private client: GraphQLClient;
+  private apiToken: string;
 
   constructor(apiToken: string, apiUrl: string = 'https://api.groovehq.com/v2/graphql') {
     if (!apiToken) {
       throw new Error('Groove API token is required');
     }
 
+    this.apiToken = apiToken;
     this.client = new GraphQLClient(apiUrl, {
       headers: {
         Authorization: `Bearer ${apiToken}`,
@@ -32,7 +34,11 @@ export class GrooveClient {
         if (graphqlError.message.includes('object of type Conversation is deleted')) {
           throw new Error('Ticket not found or deleted');
         }
-        throw new Error(`GraphQL Error: ${graphqlError.message}`);
+        throw new Error(`GraphQL Error: ${graphqlError.message.split(this.apiToken).join('[token]')}`);
+      }
+      // The original error holds the whole query, its variables and the response
+      if (error.response?.status) {
+        throw new Error(`Groove API error: HTTP ${error.response.status}`);
       }
       throw error;
     }

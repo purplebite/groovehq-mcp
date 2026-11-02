@@ -1,5 +1,6 @@
 import { GrooveClient } from '../groove-client.js';
 import { queries } from '../utils/graphql-queries.js';
+import { pageGuard } from '../utils/paging.js';
 import { Agent } from '../types/groove.js';
 
 export class AgentTools {
@@ -9,6 +10,7 @@ export class AgentTools {
     const agents: Agent[] = [];
     let after: string | undefined;
     let hasNextPage = true;
+    const nextPage = pageGuard('agents');
 
     while (hasNextPage) {
       const response = await this.client.request<{
@@ -23,7 +25,7 @@ export class AgentTools {
 
       agents.push(...response.agents.nodes);
       hasNextPage = response.agents.pageInfo.hasNextPage;
-      after = response.agents.pageInfo.endCursor;
+      if (hasNextPage) after = nextPage(response.agents.pageInfo.endCursor);
     }
 
     return agents;

@@ -1,5 +1,6 @@
 import { GrooveClient } from '../groove-client.js';
 import { queries } from '../utils/graphql-queries.js';
+import { pageGuard } from '../utils/paging.js';
 import { Tag } from '../types/groove.js';
 
 interface ListTagsArgs {
@@ -16,6 +17,7 @@ export class TagTools {
     const pageSize = 100;
     const tags: Tag[] = [];
     let after: string | undefined;
+    const nextPage = pageGuard('tags');
 
     while (true) {
       const response = await this.client.request<{
@@ -33,7 +35,7 @@ export class TagTools {
         return tags;
       }
 
-      after = response.tags.pageInfo.endCursor;
+      after = nextPage(response.tags.pageInfo.endCursor);
     }
   }
 }

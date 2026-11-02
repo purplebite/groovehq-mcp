@@ -245,6 +245,25 @@ export const queries = {
     }
   `,
 
+  listStateChanges: `
+    query ListStateChanges($filter: EventsFilterInput!, $first: Int, $after: String) {
+      events(filter: $filter, first: $first, after: $after) {
+        nodes {
+          createdAt
+          change {
+            ... on StateChanged {
+              to
+            }
+          }
+        }
+        pageInfo {
+          hasNextPage
+          endCursor
+        }
+      }
+    }
+  `,
+
   // Asking for errors on this payload crashes it, so they are left out
   uploadPayloadGenerate: `
     mutation UploadPayloadGenerate($input: UploadPayloadGenerateInput!) {
@@ -575,20 +594,6 @@ export const mutations = {
   conversationSpam: `
     mutation ConversationSpam($input: ConversationSpamInput!) {
       conversationSpam(input: $input) {
-        conversation {
-          ${CONVERSATION_FIELDS}
-        }
-        errors {
-          message
-          path
-        }
-      }
-    }
-  `,
-
-  conversationTrash: `
-    mutation ConversationTrash($input: ConversationTrashInput!) {
-      conversationTrash(input: $input) {
         conversation {
           ${CONVERSATION_FIELDS}
         }
