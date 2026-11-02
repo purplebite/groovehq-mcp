@@ -20,6 +20,10 @@ export class GrooveClient {
     });
   }
 
+  private redact(message: string): string {
+    return message.split(this.apiToken).join('[token]');
+  }
+
   async request<T = any>(query: string, variables?: any): Promise<T> {
     try {
       return await this.client.request<T>(query, variables);
@@ -34,7 +38,7 @@ export class GrooveClient {
         if (graphqlError.message.includes('object of type Conversation is deleted')) {
           throw new Error('Ticket not found or deleted');
         }
-        throw new Error(`GraphQL Error: ${graphqlError.message.split(this.apiToken).join('[token]')}`);
+        throw new Error(`GraphQL Error: ${this.redact(graphqlError.message)}`);
       }
       // The original error holds the whole query, its variables and the response
       if (error.response?.status) {
@@ -70,7 +74,7 @@ export class GrooveClient {
     const payload = response[field];
 
     if (payload.errors?.length) {
-      throw new Error(`Groove Error: ${payload.errors[0].message}`);
+      throw new Error(`Groove Error: ${this.redact(payload.errors[0].message)}`);
     }
 
     return payload;

@@ -13,7 +13,7 @@ if (!apiToken) {
 // Refuses anything else, because GROOVE_READ_ONLY=true must not start a server that writes
 function flag(name: string, fallback: boolean): boolean {
   const value = process.env[name];
-  if (!value) return fallback;
+  if (value === undefined) return fallback;
   if (value === '1') return true;
   if (value === '0') return false;
 

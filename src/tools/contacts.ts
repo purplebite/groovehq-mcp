@@ -214,6 +214,8 @@ export class ContactTools {
   }
 
   async createContact(args: CreateContactArgs): Promise<Contact> {
+    this.checkValues([args.email], EMAIL_PATTERN, 'email address');
+
     const payload = await this.client.mutate<{ contact: Contact }>(
       mutations.contactCreate,
       'contactCreate',
@@ -241,7 +243,11 @@ export class ContactTools {
         'Provide at least one of email, firstName, lastName, title, phone, companyIds, removeCompanyIds, addSecondaryEmails or removeSecondaryEmails'
       );
     }
-    this.checkValues(addEmails, EMAIL_PATTERN, 'email address');
+    this.checkValues(
+      [...addEmails, ...(args.email === undefined ? [] : [args.email])],
+      EMAIL_PATTERN,
+      'email address'
+    );
     if (removeEmails.some(email => addEmails.includes(email))) {
       throw new Error('An address cannot be in both addSecondaryEmails and removeSecondaryEmails');
     }

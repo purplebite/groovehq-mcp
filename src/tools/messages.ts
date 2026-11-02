@@ -70,7 +70,7 @@ export class MessageTools {
   async sendMessage(args: SendMessageArgs) {
     const conversationId = await this.client.resolveConversationId(args.conversationId);
     let channelId: string | undefined;
-    if (args.authorId) {
+    if (args.authorId != null) {
       await new AgentTools(this.client).checkAuthor(args.authorId);
       // Groove fails without saying why when another author replies without the mailbox
       const { node } = await this.client.request<{ node: Conversation | null }>(queries.getConversation, {
@@ -134,7 +134,7 @@ export class MessageTools {
   }
 
   async createNote(args: CreateNoteArgs): Promise<Conversation> {
-    if (args.authorId) await new AgentTools(this.client).checkAuthor(args.authorId);
+    if (args.authorId != null) await new AgentTools(this.client).checkAuthor(args.authorId);
 
     const payload = await this.client.mutate<{ conversation: Conversation }>(
       mutations.conversationAddNote,

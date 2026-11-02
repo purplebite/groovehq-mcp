@@ -300,6 +300,8 @@ describe('safety options', () => {
     ['GROOVE_ALLOW_MERGE', 'false'],
     ['GROOVE_ALLOW_PERMANENT_DELETE', 'TRUE'],
     ['GROOVE_ALLOW_ATTACHMENTS', 'true'],
+    ['GROOVE_READ_ONLY', ''],
+    ['GROOVE_ALLOW_MERGE', ''],
   ])('%s=%s stops the server', async (name, value) => {
     answer = () => undefined;
     const { code, stderr } = await start({ [name]: value });
@@ -307,7 +309,7 @@ describe('safety options', () => {
     expect(stderr).toContain(`${name} must be 1 or 0`);
   });
 
-  test.each([['GROOVE_READ_ONLY', '1'], ['GROOVE_ALLOW_MERGE', '0'], ['GROOVE_ALLOW_SEND', '']])('%s=%s starts', async (name, value) => {
+  test.each([['GROOVE_READ_ONLY', '1'], ['GROOVE_ALLOW_MERGE', '0'], ['GROOVE_ALLOW_SEND', '0']])('%s=%s starts', async (name, value) => {
     answer = () => undefined;
     expect((await start({ [name]: value })).stderr).toContain('started successfully');
   });
@@ -327,6 +329,109 @@ describe('boolean arguments', () => {
   test.each(['allowDifferentContacts', 'discardDrafts'])('mergeConversations with %s "false" merges nothing', async flag => {
     const result = await call({}, 'mergeConversations', { sourceId: 'cnv_1', targetId: 'cnv_2', [flag]: 'false' });
     expect(result.mutations).toEqual([]);
+  });
+});
+
+describe('merging tickets without contacts', () => {
+  const merge = async (source, target, args = {}) => {
+    let reads = 0;
+    call.answer = query => {
+      if (query.includes('node(')) {
+        reads++;
+        return { data: { node: { id: `cnv_${reads}`, number: reads, contact: reads === 1 ? source : target, channel: { id: 'ch_1' } } } };
+      }
+    };
+    const result = await call({}, 'mergeConversations', { sourceId: 'cnv_1', targetId: 'cnv_2', ...args });
+    call.answer = undefined;
+    return result;
+  };
+
+  test('two tickets without a contact are refused', async () => {
+    const result = await merge(null, null);
+    expect(result.mutations).toEqual([]);
+    expect(result.text).toContain('no contact');
+    expect(result.text).not.toContain('undefined');
+  });
+
+  test('one missing contact is refused', async () => {
+    expect((await merge(null, contact)).mutations).toEqual([]);
+    expect((await merge(contact, null)).mutations).toEqual([]);
+  });
+
+  test('the same contact still merges', async () => {
+    expect((await merge(contact, contact)).mutations).toEqual(['ConversationMerge']);
+  });
+
+  test('allowDifferentContacts still overrides it', async () => {
+    expect((await merge(null, null, { allowDifferentContacts: true })).mutations).toEqual(['ConversationMerge']);
+  });
+});
+
+describe('authorId', () => {
+  test.each(['', 0, false])('%j is refused with send-as off', async authorId => {
+    const result = await call({}, 'createNote', { ...note, authorId });
+    expect(result.isError).toBe(true);
+    expect(result.mutations).toEqual([]);
+  });
+
+  test('null counts as left out', async () => {
+    expect((await call({}, 'createNote', { ...note, authorId: null })).mutations).toEqual(['ConversationAddNote']);
+  });
+
+  test('an empty authorId does not skip the check with send-as on', async () => {
+    call.answer = query => (query.includes('agents(') ? { data: { agents: { nodes: [{ id: 'ag_1', state: 'ACTIVE' }], pageInfo: page } } } : undefined);
+    const result = await call({ allowSendAs: true }, 'createNote', { ...note, authorId: '' });
+    call.answer = undefined;
+    expect(result.isError).toBe(true);
+    expect(result.mutations).toEqual([]);
+  });
+});
+
+describe('argument types', () => {
+  test.each([1000000])('limit %j is passed on, Groove documents no maximum', async limit => {
+    await call({}, 'listConversations', { limit });
+    expect(requests[0].variables.first).toBe(limit);
+  });
+
+  test.each([-1, 0, 1.5, 'abc', '5'])('limit %j is refused', async limit => {
+    for (const tool of ['listConversations', 'listContacts', 'listCompanies']) {
+      requests = [];
+      const result = await call({}, tool, { limit });
+      expect(result.isError).toBe(true);
+      expect(requests).toEqual([]);
+    }
+  });
+
+  test('listMessages refuses a negative limit', async () => {
+    expect((await call({}, 'listMessages', { conversationId: '1', limit: -2 })).isError).toBe(true);
+  });
+
+  test.each([
+    ['updateConversation', { id: '1', followerIds: 'ag_1' }],
+    ['updateConversation', { id: '1', tagIds: 'tag_1' }],
+    ['updateConversation', { id: '1', tagIds: [1] }],
+    ['createNote', { conversationId: '1', body: { html: 'x' } }],
+    ['listContacts', { olderThanDays: 'old', orphansOnly: true }],
+  ])('%s refuses %j', async (tool, args) => {
+    const result = await call({}, tool, args);
+    expect(result.isError).toBe(true);
+    expect(result.mutations).toEqual([]);
+  });
+
+  test.each(['not an address', 'a@b', 'a b@example.com'])('createContact refuses email %j', async email => {
+    const result = await call({}, 'createContact', { email });
+    expect(result.isError).toBe(true);
+    expect(result.mutations).toEqual([]);
+  });
+
+  test('updateContact refuses a bad email', async () => {
+    const result = await call({}, 'updateContact', { id: 'co_1', email: 'not an address' });
+    expect(result.isError).toBe(true);
+    expect(result.mutations).toEqual([]);
+  });
+
+  test('a plus address is fine', async () => {
+    expect((await call({}, 'createContact', { email: 'a+b@example.com' })).mutations).toEqual(['ContactCreate']);
   });
 });
 
@@ -412,6 +517,18 @@ describe('errors', () => {
   test('a token that Groove repeats in an error is masked', async () => {
     call.answer = () => ({ errors: [{ message: `Denied for ${TOKEN}` }] });
     const result = await call({}, 'listConversations', {});
+    call.answer = undefined;
+    expect(result.text).toContain('Denied for [token]');
+    expect(result.text).not.toContain(TOKEN);
+  });
+
+  test('a token that Groove repeats in a mutation error is masked', async () => {
+    call.answer = query => {
+      if (query.trim().startsWith('mutation')) {
+        return { data: { conversationClose: { errors: [{ message: `Denied for ${TOKEN}` }] } } };
+      }
+    };
+    const result = await call({}, 'closeConversation', { id: '1' });
     call.answer = undefined;
     expect(result.text).toContain('Denied for [token]');
     expect(result.text).not.toContain(TOKEN);

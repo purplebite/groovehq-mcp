@@ -79,6 +79,33 @@ const WRITE_TOOLS = [
   'deleteDraft',
 ];
 
+interface ArgumentSchema {
+  type?: string;
+  items?: { type?: string };
+}
+
+function checkArgument(key: string, field: ArgumentSchema, value: unknown): void {
+  if (value === undefined) return;
+  if (field.type === 'boolean') {
+    if (typeof value !== 'boolean') throw new Error(`${key} must be true or false`);
+    return;
+  }
+  if (value === null) return;
+
+  if (key === 'limit') {
+    if (!Number.isInteger(value) || (value as number) < 1) throw new Error('limit must be a whole number of at least 1');
+  } else if (field.type === 'number') {
+    if (typeof value !== 'number' || !Number.isFinite(value)) throw new Error(`${key} must be a number`);
+  } else if (field.type === 'string') {
+    if (typeof value !== 'string') throw new Error(`${key} must be text`);
+  } else if (field.type === 'array') {
+    if (!Array.isArray(value)) throw new Error(`${key} must be a list`);
+    if (field.items?.type === 'string' && value.some(item => typeof item !== 'string')) {
+      throw new Error(`${key} must be a list of text`);
+    }
+  }
+}
+
 export function createGrooveServer(opts: GrooveServerOptions): Server {
   if (!opts.token) {
     throw new Error('Groove API token is required');
@@ -125,7 +152,7 @@ export function createGrooveServer(opts: GrooveServerOptions): Server {
   const server = new Server(
     {
       name: 'groovehq-mcp',
-      version: '0.10.0',
+      version: '0.10.1',
     },
     {
       capabilities: {
@@ -1189,16 +1216,14 @@ export function createGrooveServer(opts: GrooveServerOptions): Server {
         throw new Error(`${name} is disabled: ${reason}`);
       }
 
-      if (args?.authorId && !allowSendAs) {
+      if (args?.authorId != null && !allowSendAs) {
         throw new Error('Acting as another agent is off: it needs GROOVE_ALLOW_SEND_AS=1');
       }
 
       // The server gets every call as is, so the schema of a tool isn't enforced by anything else
       const schema = tools.find(tool => tool.name === name)?.inputSchema.properties ?? {};
-      for (const [key, field] of Object.entries(schema as Record<string, { type?: string }>)) {
-        if (field.type === 'boolean' && args?.[key] !== undefined && typeof args[key] !== 'boolean') {
-          throw new Error(`${key} must be true or false`);
-        }
+      for (const [key, field] of Object.entries(schema as Record<string, ArgumentSchema>)) {
+        checkArgument(key, field, args?.[key]);
       }
 
       // Refused rather than ignored, so a mail never goes out without its file

@@ -159,7 +159,7 @@ export class ConversationTools {
     if (args.snoozedUntil && args.state !== 'snoozed') {
       throw new Error('snoozedUntil needs state snoozed');
     }
-    if (args.authorId) await new AgentTools(this.client).checkAuthor(args.authorId);
+    if (args.authorId != null) await new AgentTools(this.client).checkAuthor(args.authorId);
 
     const payload = await this.client.mutate<{ conversation: Conversation }>(
       mutations.conversationCreateEmail,
@@ -187,7 +187,7 @@ export class ConversationTools {
 
   // Groove's "Log a Conversation": a new ticket that starts with a note, so no mail goes out
   async logConversation(args: LogConversationArgs) {
-    if (args.authorId) await new AgentTools(this.client).checkAuthor(args.authorId);
+    if (args.authorId != null) await new AgentTools(this.client).checkAuthor(args.authorId);
 
     const payload = await this.client.mutate<{ conversation: Conversation }>(
       mutations.conversationLog,
@@ -450,10 +450,13 @@ export class ConversationTools {
     const source = await this.mergeTicket(sourceId);
     const target = await this.mergeTicket(targetId);
 
-    if (args.allowDifferentContacts !== true && source.contact?.id !== target.contact?.id) {
+    const sameContact = source.contact && source.contact.id === target.contact?.id;
+    if (args.allowDifferentContacts !== true && !sameContact) {
+      const sourceEmail = source.contact?.email ?? 'no contact';
+      const targetEmail = target.contact?.email ?? 'no contact';
       throw new Error(
-        `Ticket #${source.number} is from ${source.contact?.email} and #${target.number} from ${target.contact?.email}. ` +
-          `After a merge the conversation only shows under ${target.contact?.email}. ` +
+        `Ticket #${source.number} is from ${sourceEmail} and #${target.number} from ${targetEmail}. ` +
+          `After a merge the conversation only shows under ${targetEmail}. ` +
           'Ask the user, then pass allowDifferentContacts to go ahead.'
       );
     }
