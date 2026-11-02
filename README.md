@@ -53,7 +53,7 @@ Tickets go by their number, just like in Groove. `12345`, `#12345`, and `cnv_123
 
 ## Installation
 
-You'll need Node.js 18 or newer and a Groove API token. Grab your token here, with your own subdomain filled in:
+You'll need Node.js 22 or newer and a Groove API token. Grab your token here, with your own subdomain filled in:
 
 ```
 https://YOUR_SUBDOMAIN.groovehq.com/settings/developer/api
