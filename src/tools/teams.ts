@@ -2,6 +2,7 @@ import { GrooveClient } from '../groove-client.js';
 import { queries } from '../utils/graphql-queries.js';
 import { pageGuard } from '../utils/paging.js';
 import { Team } from '../types/groove.js';
+import { defineTool, READ_TOOL } from './definition.js';
 
 export class TeamTools {
   constructor(private client: GrooveClient) {}
@@ -31,3 +32,15 @@ export class TeamTools {
     return teams;
   }
 }
+
+export const listTeams = defineTool({
+  name: 'listTeams',
+  setting: 'read',
+  annotations: READ_TOOL,
+  description: 'List all teams, for filtering or assigning tickets',
+  inputSchema: {
+    type: 'object',
+    properties: {},
+  },
+  handler: (_args, { teams }) => teams.listTeams(),
+});

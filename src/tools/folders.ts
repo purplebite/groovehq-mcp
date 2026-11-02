@@ -2,6 +2,7 @@ import { GrooveClient } from '../groove-client.js';
 import { queries } from '../utils/graphql-queries.js';
 import { Folder, FolderOwner } from '../types/groove.js';
 import { TeamTools } from './teams.js';
+import { defineTool, READ_TOOL } from './definition.js';
 
 const PAGE_SIZE = 50;
 const MAX_PAGES = 20;
@@ -64,3 +65,15 @@ export class FolderTools {
     return [...folders.values()];
   }
 }
+
+export const listFolders = defineTool({
+  name: 'listFolders',
+  setting: 'read',
+  annotations: READ_TOOL,
+  description: 'List the Smart Folders this agent can open, in sidebar order, with their teams, agents, mailboxes, and the team they filter on. Names can repeat, so check these before you pick one.',
+  inputSchema: {
+    type: 'object',
+    properties: {},
+  },
+  handler: (_args, { folders }) => folders.listFolders(),
+});

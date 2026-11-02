@@ -1,4 +1,4 @@
-import { GraphQLClient } from 'graphql-request';
+import { GraphQLClient, Variables } from 'graphql-request';
 import { GraphQLError } from './types/groove.js';
 import { queries } from './utils/graphql-queries.js';
 
@@ -24,12 +24,13 @@ export class GrooveClient {
     return message.split(this.apiToken).join('[token]');
   }
 
-  async request<T = any>(query: string, variables?: any): Promise<T> {
+  async request<T = unknown>(query: string, variables?: Variables): Promise<T> {
     try {
       return await this.client.request<T>(query, variables);
-    } catch (error: any) {
-      if (error.response?.errors) {
-        const graphqlError = error.response.errors[0] as GraphQLError;
+    } catch (error) {
+      const { response } = error as { response?: { errors?: GraphQLError[]; status?: number } };
+      if (response?.errors) {
+        const graphqlError = response.errors[0];
         if (graphqlError.extensions?.code === 'RESOURCE_MERGED') {
           const target = String(graphqlError.extensions.new_conversation_id).replace(/^cnv_/, '#');
           throw new Error(`Ticket was merged into ${target}`);
@@ -41,8 +42,8 @@ export class GrooveClient {
         throw new Error(`GraphQL Error: ${this.redact(graphqlError.message)}`);
       }
       // The original error holds the whole query, its variables and the response
-      if (error.response?.status) {
-        throw new Error(`Groove API error: HTTP ${error.response.status}`);
+      if (response?.status) {
+        throw new Error(`Groove API error: HTTP ${response.status}`);
       }
       throw error;
     }
@@ -67,7 +68,7 @@ export class GrooveClient {
   }
 
   // Mutations report validation failures in the payload instead of as GraphQL errors
-  async mutate<T = any>(mutation: string, field: string, input: any): Promise<T> {
+  async mutate<T = unknown>(mutation: string, field: string, input: Variables): Promise<T> {
     const response = await this.request<
       Record<string, T & { errors?: Array<{ message: string }> }>
     >(mutation, { input });

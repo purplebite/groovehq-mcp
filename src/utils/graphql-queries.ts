@@ -146,6 +146,11 @@ const KB_ARTICLE_FIELDS = `
   createdAt
   updatedAt
   publishedAt
+  currentVersion {
+    title
+    description
+    body
+  }
 `;
 
 export const queries = {

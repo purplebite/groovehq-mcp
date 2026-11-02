@@ -1,6 +1,7 @@
 import { GrooveClient } from '../groove-client.js';
 import { queries, mutations } from '../utils/graphql-queries.js';
 import { Contact } from '../types/groove.js';
+import { defineTool, ADDITIVE_TOOL, DESTRUCTIVE_TOOL, READ_TOOL } from './definition.js';
 
 interface ListContactsArgs {
   search?: string;
@@ -536,3 +537,325 @@ export class ContactTools {
     return matches[0];
   }
 }
+
+export const listContacts = defineTool<ListContactsArgs>({
+  name: 'listContacts',
+  setting: 'read',
+  annotations: READ_TOOL,
+  description: 'List contacts with optional search, with their ticket counts. Returns one page; if pageInfo.hasNextPage is true, more results exist.',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      search: {
+        type: 'string',
+        description: 'Search string to filter contacts. Also finds part of a name or address',
+      },
+      email: {
+        type: 'string',
+        description: 'Find the contact with exactly this email address',
+      },
+      orderBy: {
+        type: 'object',
+        description: 'Sort order',
+        properties: {
+          field: {
+            type: 'string',
+            enum: ['COMPANY_NAME', 'CONVERSATION_COUNT', 'CREATED_AT', 'EMAIL', 'JOB_TITLE', 'LAST_SEEN_AT', 'NAME', 'UPDATED_AT'],
+          },
+          direction: {
+            type: 'string',
+            enum: ['ASC', 'DESC'],
+            default: 'ASC',
+          },
+        },
+        required: ['field'],
+      },
+      orphansOnly: {
+        type: 'boolean',
+        description:
+          'Only contacts with 0 tickets. Reads at most 500 contacts per call, so call again with after for more. Never deletes anything. A contact can have 0 tickets and still have been CCed or have written mail in a merged ticket',
+      },
+      olderThanDays: {
+        type: 'number',
+        description: 'With orphansOnly: skip contacts created in the last N days',
+      },
+      limit: {
+        type: 'number',
+        description: 'Maximum number of contacts per page. Groove returns at most 100. With orphansOnly it stops reading at this many, default 50, and can return slightly more',
+        default: 20,
+      },
+      after: {
+        type: 'string',
+        description: 'Cursor for pagination',
+      },
+    },
+  },
+  handler: (args, { contacts }) => contacts.listContacts(args),
+});
+
+export const listCompanies = defineTool<ListCompaniesArgs>({
+  name: 'listCompanies',
+  setting: 'read',
+  annotations: READ_TOOL,
+  description: 'List companies with optional search. Returns one page; if pageInfo.hasNextPage is true, more results exist.',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      search: {
+        type: 'string',
+        description: 'Search string to filter companies',
+      },
+      orderBy: {
+        type: 'object',
+        description: 'Sort order. Use CONVERSATION_COUNT with DESC for the companies with the most tickets. Groove sorts counts only roughly, so sort the result again before showing a ranking',
+        properties: {
+          field: {
+            type: 'string',
+            enum: ['CONTACT_COUNT', 'CONVERSATION_COUNT', 'CREATED_AT', 'DOMAIN', 'NAME', 'UPDATED_AT'],
+          },
+          direction: {
+            type: 'string',
+            enum: ['ASC', 'DESC'],
+            default: 'ASC',
+          },
+        },
+        required: ['field'],
+      },
+      limit: {
+        type: 'number',
+        description: 'Maximum number of companies to return per page',
+        default: 20,
+      },
+      after: {
+        type: 'string',
+        description: 'Cursor for pagination',
+      },
+    },
+  },
+  handler: (args, { contacts }) => contacts.listCompanies(args),
+});
+
+export const updateCompany = defineTool<UpdateCompanyArgs>({
+  name: 'updateCompany',
+  setting: 'write',
+  annotations: DESTRUCTIVE_TOOL,
+  description: "Change a company's name or its extra domains. Groove often creates companies from mail domains, with no name or just the domain",
+  inputSchema: {
+    type: 'object',
+    properties: {
+      id: {
+        type: 'string',
+        description: 'The company ID',
+      },
+      name: {
+        type: 'string',
+        description: 'New name of the company',
+      },
+      addDomains: {
+        type: 'array',
+        items: { type: 'string' },
+        description: 'Extra domains to add (existing domains are kept)',
+      },
+      removeDomains: {
+        type: 'array',
+        items: { type: 'string' },
+        description: 'Extra domains to remove. The main domain cannot be removed',
+      },
+    },
+    required: ['id'],
+  },
+  handler: (args, { contacts }) => contacts.updateCompany(args),
+});
+
+export const mergeContacts = defineTool<MergeContactsArgs>({
+  name: 'mergeContacts',
+  setting: 'merge',
+  annotations: DESTRUCTIVE_TOOL,
+  description:
+    'Permanently merge one contact into another, for example a typo address into the right one. This cannot be undone, so always confirm with the user first. ' +
+    'The source contact and its address disappear. Its tickets move to the target, and its mail then shows the target as sender',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      source: {
+        type: 'string',
+        description: 'Contact that disappears: exact email address or contact ID',
+      },
+      target: {
+        type: 'string',
+        description: 'Contact that stays: exact email address or contact ID',
+      },
+    },
+    required: ['source', 'target'],
+  },
+  handler: (args, { contacts }) => contacts.mergeContacts(args),
+});
+
+export const deleteContact = defineTool<DeleteContactArgs>({
+  name: 'deleteContact',
+  setting: 'write',
+  annotations: DESTRUCTIVE_TOOL,
+  description:
+    'Permanently delete one contact by exact email address, which also removes it from recipient suggestions. A contact with tickets cannot be deleted: use mergeContacts. ' +
+    'Without confirm it only shows what would be deleted. Always show that to the user first. ' +
+    'Mail this contact wrote in a merged ticket loses its sender',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      email: {
+        type: 'string',
+        description: 'Exact email address of the contact',
+      },
+      confirm: {
+        type: 'boolean',
+        description: 'Really delete it. Only after the user agreed',
+        default: false,
+      },
+    },
+    required: ['email'],
+  },
+  handler: (args, { contacts }) => contacts.deleteContact(args),
+});
+
+export const deleteContacts = defineTool<DeleteContactsArgs>({
+  name: 'deleteContacts',
+  setting: 'write',
+  annotations: DESTRUCTIVE_TOOL,
+  description:
+    'Permanently delete up to 100 contacts by ID, one by one. A contact with tickets is skipped. ' +
+    'Without confirm it only shows what would be deleted. Always show that to the user first. ' +
+    'Mail these contacts wrote in merged tickets loses its sender',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      contactIds: {
+        type: 'array',
+        items: { type: 'string' },
+        description: 'Contact IDs to delete, at most 100',
+      },
+      confirm: {
+        type: 'boolean',
+        description: 'Really delete them. Only after the user agreed',
+        default: false,
+      },
+    },
+    required: ['contactIds'],
+  },
+  handler: (args, { contacts }) => contacts.deleteContacts(args),
+});
+
+export const getContact = defineTool<{ id: string }>({
+  name: 'getContact',
+  setting: 'read',
+  annotations: READ_TOOL,
+  description: 'Get detailed information about a specific contact',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      id: {
+        type: 'string',
+        description: 'The contact ID',
+      },
+    },
+    required: ['id'],
+  },
+  handler: async (args, { contacts }) => {
+    const result = await contacts.getContact(args.id);
+    if (!result) {
+      throw new Error(`Contact not found: ${args.id}`);
+    }
+    return result;
+  },
+});
+
+export const createContact = defineTool<CreateContactArgs>({
+  name: 'createContact',
+  setting: 'write',
+  annotations: ADDITIVE_TOOL,
+  description: 'Create a new contact',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      email: {
+        type: 'string',
+        description: 'Contact email address',
+      },
+      firstName: {
+        type: 'string',
+        description: 'Contact first name',
+      },
+      lastName: {
+        type: 'string',
+        description: 'Contact last name',
+      },
+      title: {
+        type: 'string',
+        description: 'Contact job title',
+      },
+      phone: {
+        type: 'string',
+        description: 'Contact phone number',
+      },
+    },
+    required: ['email'],
+  },
+  handler: (args, { contacts }) => contacts.createContact(args),
+});
+
+export const updateContact = defineTool<UpdateContactArgs>({
+  name: 'updateContact',
+  setting: 'write',
+  annotations: DESTRUCTIVE_TOOL,
+  description: 'Update contact information, companies and extra email addresses',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      id: {
+        type: 'string',
+        description: 'The contact ID',
+      },
+      email: {
+        type: 'string',
+        description: 'Contact email address',
+      },
+      firstName: {
+        type: 'string',
+        description: 'Contact first name',
+      },
+      lastName: {
+        type: 'string',
+        description: 'Contact last name',
+      },
+      title: {
+        type: 'string',
+        description: 'Contact job title',
+      },
+      phone: {
+        type: 'string',
+        description: 'Contact phone number',
+      },
+      companyIds: {
+        type: 'array',
+        items: { type: 'string' },
+        description: 'Company IDs to add the contact to (existing companies are kept)',
+      },
+      removeCompanyIds: {
+        type: 'array',
+        items: { type: 'string' },
+        description: 'Company IDs to remove the contact from',
+      },
+      addSecondaryEmails: {
+        type: 'array',
+        items: { type: 'string' },
+        description: 'Extra email addresses to add to the contact (existing ones are kept)',
+      },
+      removeSecondaryEmails: {
+        type: 'array',
+        items: { type: 'string' },
+        description: 'Extra email addresses to remove. Use email to change the main address',
+      },
+    },
+    required: ['id'],
+  },
+  handler: (args, { contacts }) => contacts.updateContact(args),
+});

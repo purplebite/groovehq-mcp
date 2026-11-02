@@ -144,6 +144,8 @@ export interface KnowledgeBaseArticle {
   createdAt: string;
   updatedAt: string;
   publishedAt?: string;
+  // The version on the help site; title, description and body can hold unpublished changes
+  currentVersion?: { title: string; description?: string; body: string } | null;
 }
 
 export interface KnowledgeBaseCategory {
@@ -156,7 +158,7 @@ export interface GraphQLError {
   message: string;
   extensions?: {
     code: string;
-    [key: string]: any;
+    [key: string]: unknown;
   };
 }
 

@@ -1,5 +1,6 @@
 import { GrooveClient } from '../groove-client.js';
 import { Channel } from '../types/groove.js';
+import { defineTool, READ_TOOL } from './definition.js';
 
 const CHANNEL_FIELDS = `
   ... on Channel {
@@ -68,3 +69,45 @@ export class ChannelTools {
     return response.node;
   }
 }
+
+export const listChannels = defineTool<ListChannelsArgs>({
+  name: 'listChannels',
+  setting: 'read',
+  annotations: READ_TOOL,
+  description: 'List all available channels/inboxes',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      limit: {
+        type: 'number',
+        description: 'Maximum number of channels to return',
+        default: 50,
+      },
+    },
+  },
+  handler: (args, { channels }) => channels.listChannels(args),
+});
+
+export const getChannel = defineTool<{ id: string }>({
+  name: 'getChannel',
+  setting: 'read',
+  annotations: READ_TOOL,
+  description: 'Get detailed information about a specific channel',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      id: {
+        type: 'string',
+        description: 'The channel ID',
+      },
+    },
+    required: ['id'],
+  },
+  handler: async (args, { channels }) => {
+    const result = await channels.getChannel(args.id);
+    if (!result) {
+      throw new Error(`Channel not found: ${args.id}`);
+    }
+    return result;
+  },
+});

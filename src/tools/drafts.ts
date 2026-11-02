@@ -2,6 +2,7 @@ import { GrooveClient } from '../groove-client.js';
 import { queries, mutations } from '../utils/graphql-queries.js';
 import { pageGuard } from '../utils/paging.js';
 import { Draft } from '../types/groove.js';
+import { defineTool, ADDITIVE_TOOL, DESTRUCTIVE_TOOL, READ_TOOL } from './definition.js';
 
 interface ListDraftsArgs {
   conversationId?: string;
@@ -181,3 +182,88 @@ export class DraftTools {
     };
   }
 }
+
+export const listDrafts = defineTool<ListDraftsArgs>({
+  name: 'listDrafts',
+  setting: 'read',
+  annotations: READ_TOOL,
+  description: 'List your own unsent drafts, optionally for one ticket. Read-only. Drafts of other agents are not visible through the API.',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      conversationId: {
+        type: 'string',
+        description: 'Ticket number (e.g. 12345) or conversation ID',
+      },
+    },
+  },
+  handler: (args, { drafts }) => drafts.listDrafts(args),
+});
+
+export const createReplyDraft = defineTool<CreateReplyDraftArgs>({
+  name: 'createReplyDraft',
+  setting: 'write',
+  annotations: ADDITIVE_TOOL,
+  description: 'Save a reply or note on a ticket as a draft for a person to review. NEVER SENDS anything. Drafts always belong to an existing ticket and are visible only to the agent who owns the API token.',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      conversationId: {
+        type: 'string',
+        description: 'Ticket number (e.g. 12345) or conversation ID',
+      },
+      body: {
+        type: 'string',
+        description: 'The draft text, as plain text or HTML',
+      },
+      to: {
+        type: 'array',
+        items: { type: 'string' },
+        description: "Recipient email addresses (default: the ticket's contact)",
+      },
+      cc: {
+        type: 'array',
+        items: { type: 'string' },
+        description: 'Cc email addresses',
+      },
+      bcc: {
+        type: 'array',
+        items: { type: 'string' },
+        description: 'Bcc email addresses',
+      },
+      replyAll: {
+        type: 'boolean',
+        description: 'Mark the draft as reply-all in the app',
+      },
+      note: {
+        type: 'boolean',
+        description: 'Save an internal note draft instead of a reply; no recipients allowed',
+      },
+    },
+    required: ['conversationId', 'body'],
+  },
+  handler: (args, { drafts }) => drafts.createReplyDraft(args),
+});
+
+export const deleteDraft = defineTool<DeleteDraftArgs>({
+  name: 'deleteDraft',
+  setting: 'write',
+  annotations: DESTRUCTIVE_TOOL,
+  description: 'Delete one of your own drafts from a ticket',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      draftId: {
+        type: 'string',
+        description: 'The draftId returned by listDrafts or createReplyDraft',
+      },
+      conversationId: {
+        type: 'string',
+        description: 'Ticket number (e.g. 12345) or conversation ID the draft belongs to',
+      },
+    },
+    required: ['draftId', 'conversationId'],
+  },
+  handler: (args, { drafts }) =>
+    drafts.deleteDraft({ draftId: args.draftId, conversationId: args.conversationId }),
+});

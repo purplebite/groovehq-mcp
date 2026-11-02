@@ -42,7 +42,9 @@ async function main() {
     process.exit(1);
   }
 
-  const transport = new StdioServerTransport();
+  // The SDK closes the connection on a message over 10 MB. An attachment of the
+  // allowed 20 MB is about 27 MB as base64, so it gets refused with an error instead
+  const transport = new StdioServerTransport(process.stdin, process.stdout, { maxBufferSize: 32 * 1024 * 1024 });
   await server.connect(transport);
   console.error('Groove MCP server started successfully');
 }

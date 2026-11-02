@@ -4,6 +4,7 @@ import { pageGuard } from '../utils/paging.js';
 import { Conversation, Message } from '../types/groove.js';
 import { AgentTools } from './agents.js';
 import { AttachmentArg, uploadAttachments } from './attachments.js';
+import { defineTool, ADDITIVE_TOOL, DESTRUCTIVE_TOOL, READ_TOOL } from './definition.js';
 
 interface ListMessagesArgs {
   conversationId: string;
@@ -150,3 +151,171 @@ export class MessageTools {
     return payload.conversation;
   }
 }
+
+export const undoSend = defineTool<{ conversationId: string; changesetId: string }>({
+  name: 'undoSend',
+  setting: 'send',
+  annotations: DESTRUCTIVE_TOOL,
+  description: 'Cancel a mail just sent with sendMessage or forwardConversation. Only works right after sending, while Groove has not sent it yet.',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      conversationId: {
+        type: 'string',
+        description: 'Ticket number (e.g. 12345) or conversation ID',
+      },
+      changesetId: {
+        type: 'string',
+        description: 'The changesetId that sendMessage or forwardConversation returned',
+      },
+    },
+    required: ['conversationId', 'changesetId'],
+  },
+  handler: (args, { messages }) => messages.undoSend(args.conversationId, args.changesetId),
+});
+
+export const editNote = defineTool<{ messageId: string; body: string }>({
+  name: 'editNote',
+  setting: 'write',
+  annotations: DESTRUCTIVE_TOOL,
+  description: 'Change the text of an internal note. Use listMessages to find its ID.',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      messageId: {
+        type: 'string',
+        description: 'ID of the note',
+      },
+      body: {
+        type: 'string',
+        description: 'New text of the note',
+      },
+    },
+    required: ['messageId', 'body'],
+  },
+  handler: (args, { messages }) => messages.editNote(args.messageId, args.body),
+});
+
+export const reactToNote = defineTool<{ messageId: string; reaction: string }>({
+  name: 'reactToNote',
+  setting: 'write',
+  annotations: ADDITIVE_TOOL,
+  description: 'Add a reaction to an internal note, or remove it if this agent already gave that reaction. Groove does not show reactions through the API.',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      messageId: {
+        type: 'string',
+        description: 'ID of the note',
+      },
+      reaction: {
+        type: 'string',
+        description: 'The emoji, for example 👍',
+      },
+    },
+    required: ['messageId', 'reaction'],
+  },
+  handler: (args, { messages }) => messages.reactToNote(args.messageId, args.reaction),
+});
+
+export const deleteNote = defineTool<{ messageId: string }>({
+  name: 'deleteNote',
+  setting: 'write',
+  annotations: DESTRUCTIVE_TOOL,
+  description: 'Delete an internal note. Confirm with the user first.',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      messageId: {
+        type: 'string',
+        description: 'ID of the note',
+      },
+    },
+    required: ['messageId'],
+  },
+  handler: (args, { messages }) => messages.deleteNote(args.messageId),
+});
+
+export const listMessages = defineTool<ListMessagesArgs>({
+  name: 'listMessages',
+  setting: 'read',
+  annotations: READ_TOOL,
+  description: 'List messages and notes in a conversation, oldest first. Groove can still return notes that were deleted, and mail that was moved to another ticket',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      conversationId: {
+        type: 'string',
+        description: 'Ticket number (e.g. 12345) or conversation ID',
+      },
+      limit: {
+        type: 'number',
+        description: 'Return only this many of the most recent messages (default: all)',
+      },
+    },
+    required: ['conversationId'],
+  },
+  handler: (args, { messages }) => messages.listMessages(args),
+});
+
+export const sendMessage = defineTool<SendMessageArgs>({
+  name: 'sendMessage',
+  setting: 'send',
+  annotations: DESTRUCTIVE_TOOL,
+  description: 'SENDS AN EMAIL IMMEDIATELY as a reply on a ticket. Use only when the user explicitly asks to send this message; to prepare a reply for review, use createReplyDraft.',
+  inputSchema: ({ authorField, attachmentsField }) => ({
+    type: 'object',
+    properties: {
+      conversationId: {
+        type: 'string',
+        description: 'Ticket number (e.g. 12345) or conversation ID',
+      },
+      to: {
+        type: 'string',
+        description: 'Email address of the recipient',
+      },
+      body: {
+        type: 'string',
+        description: 'The message body content',
+      },
+      cc: {
+        type: 'array',
+        items: { type: 'string' },
+        description: 'Email addresses to send a copy to',
+      },
+      bcc: {
+        type: 'array',
+        items: { type: 'string' },
+        description: 'Email addresses to send a hidden copy to',
+      },
+      ...attachmentsField,
+      ...authorField,
+    },
+    required: ['conversationId', 'to', 'body'],
+  }),
+  handler: (args, { messages }) => messages.sendMessage(args),
+});
+
+export const createNote = defineTool<CreateNoteArgs>({
+  name: 'createNote',
+  setting: 'write',
+  annotations: ADDITIVE_TOOL,
+  description: 'Create an internal note in a conversation',
+  inputSchema: ({ authorField, attachmentsField }) => ({
+    type: 'object',
+    properties: {
+      conversationId: {
+        type: 'string',
+        description: 'Ticket number (e.g. 12345) or conversation ID',
+      },
+      body: {
+        type: 'string',
+        description: 'The note content',
+      },
+      ...attachmentsField,
+      ...authorField,
+    },
+    required: ['conversationId', 'body'],
+  }),
+  handler: (args, { messages }) => messages.createNote(args),
+});

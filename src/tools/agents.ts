@@ -2,6 +2,7 @@ import { GrooveClient } from '../groove-client.js';
 import { queries } from '../utils/graphql-queries.js';
 import { pageGuard } from '../utils/paging.js';
 import { Agent } from '../types/groove.js';
+import { defineTool, READ_TOOL } from './definition.js';
 
 export class AgentTools {
   constructor(private client: GrooveClient) {}
@@ -45,3 +46,39 @@ export class AgentTools {
     if (agent.state !== 'ACTIVE') throw new Error(`Agent ${authorId} is not active`);
   }
 }
+
+export const listAgents = defineTool({
+  name: 'listAgents',
+  setting: 'read',
+  annotations: READ_TOOL,
+  description: 'List all agents in the organization',
+  inputSchema: {
+    type: 'object',
+    properties: {},
+  },
+  handler: (_args, { agents }) => agents.listAgents(),
+});
+
+export const getAgent = defineTool<{ id: string }>({
+  name: 'getAgent',
+  setting: 'read',
+  annotations: READ_TOOL,
+  description: 'Get detailed information about a specific agent',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      id: {
+        type: 'string',
+        description: 'The agent ID',
+      },
+    },
+    required: ['id'],
+  },
+  handler: async (args, { agents }) => {
+    const result = await agents.getAgent(args.id);
+    if (!result) {
+      throw new Error(`Agent not found: ${args.id}`);
+    }
+    return result;
+  },
+});

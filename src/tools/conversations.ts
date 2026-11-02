@@ -1,3 +1,4 @@
+import { Variables } from 'graphql-request';
 import { GrooveClient } from '../groove-client.js';
 import { queries, mutations } from '../utils/graphql-queries.js';
 import { Conversation } from '../types/groove.js';
@@ -5,6 +6,7 @@ import { AgentTools } from './agents.js';
 import { DraftTools } from './drafts.js';
 import { AttachmentArg, uploadAttachments } from './attachments.js';
 import { pageGuard } from '../utils/paging.js';
+import { defineTool, ADDITIVE_TOOL, DESTRUCTIVE_TOOL, READ_TOOL } from './definition.js';
 
 interface ListConversationsArgs {
   state?: 'unread' | 'opened' | 'closed' | 'snoozed';
@@ -112,7 +114,15 @@ export class ConversationTools {
   }
 
   async listConversations(args: ListConversationsArgs): Promise<ListConversationsResult> {
-    const filter: any = {};
+    const filter: {
+      state?: string;
+      assigned?: { agent?: string; team?: string };
+      contactId?: string;
+      channelId?: string;
+      folderId?: string;
+      tags?: string[];
+      keywords?: string;
+    } = {};
 
     if (args.state) filter.state = args.state.toUpperCase();
     if (args.assignedAgentId) filter.assigned = { agent: args.assignedAgentId };
@@ -228,7 +238,7 @@ export class ConversationTools {
     let conversation: Conversation | undefined;
 
     // Groove has no atomic update, so a failure reports the steps that already went through
-    const apply = async (step: string, mutation: string, field: string, input: any) => {
+    const apply = async (step: string, mutation: string, field: string, input: Variables) => {
       try {
         const payload = await this.client.mutate<{ conversation: Conversation }>(
           mutation,
@@ -503,3 +513,462 @@ export class ConversationTools {
     return payload.conversation;
   }
 }
+
+export const listConversations = defineTool<ListConversationsArgs>({
+  name: 'listConversations',
+  setting: 'read',
+  annotations: READ_TOOL,
+  description: 'List conversations with optional filters. Returns one page; if pageInfo.hasNextPage is true, more results exist.',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      state: {
+        type: 'string',
+        enum: ['unread', 'opened', 'closed', 'snoozed'],
+        description: 'Filter by conversation state. opened also includes unread, but leaves out snoozed: ask for snoozed separately to see every ticket that still needs work',
+      },
+      assignedAgentId: {
+        type: 'string',
+        description: 'Filter by assigned agent ID',
+      },
+      assignedTeamId: {
+        type: 'string',
+        description: 'Filter by assigned team ID',
+      },
+      contactId: {
+        type: 'string',
+        description: 'Filter by contact ID',
+      },
+      channelId: {
+        type: 'string',
+        description: 'Filter by channel ID',
+      },
+      folderId: {
+        type: 'string',
+        description: "Only tickets in this Smart Folder. Get the ID from listFolders. Don't combine it with channelId, unless that mailbox is listed for the folder.",
+      },
+      tagIds: {
+        type: 'array',
+        items: { type: 'string' },
+        description: 'Filter by tag IDs',
+      },
+      keywords: {
+        type: 'string',
+        description: 'Full-text search across conversations',
+      },
+      limit: {
+        type: 'number',
+        description: 'Maximum number of conversations to return per page',
+        default: 20,
+      },
+      after: {
+        type: 'string',
+        description: 'Cursor for the next page (pageInfo.endCursor from the previous result)',
+      },
+    },
+  },
+  handler: (args, { conversations }) => conversations.listConversations(args),
+});
+
+export const getConversation = defineTool<{ id: string }>({
+  name: 'getConversation',
+  setting: 'read',
+  annotations: READ_TOOL,
+  description: 'Get detailed information about a specific conversation',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      id: {
+        type: 'string',
+        description: 'Ticket number (e.g. 12345) or conversation ID',
+      },
+    },
+    required: ['id'],
+  },
+  handler: async (args, { conversations }) => {
+    const result = await conversations.getConversation(args.id);
+    if (!result) {
+      throw new Error(`Conversation not found: ${args.id}`);
+    }
+    return result;
+  },
+});
+
+export const createConversation = defineTool<CreateConversationArgs>({
+  name: 'createConversation',
+  setting: 'send',
+  annotations: DESTRUCTIVE_TOOL,
+  description: 'SENDS AN EMAIL IMMEDIATELY to the given address and creates a ticket. Use only when the user explicitly asks to send this message.',
+  inputSchema: ({ authorField, attachmentsField }) => ({
+    type: 'object',
+    properties: {
+      channelId: {
+        type: 'string',
+        description: 'ID of the channel to send from',
+      },
+      to: {
+        type: 'string',
+        description: 'Email address of the recipient',
+      },
+      toName: {
+        type: 'string',
+        description: 'Name of the recipient (defaults to the email address)',
+      },
+      subject: {
+        type: 'string',
+        description: 'Subject of the conversation',
+      },
+      body: {
+        type: 'string',
+        description: 'Initial message body',
+      },
+      assignedAgentId: {
+        type: 'string',
+        description: 'ID of agent to assign the conversation to',
+      },
+      assignedTeamId: {
+        type: 'string',
+        description: 'ID of team to assign the conversation to',
+      },
+      tagIds: {
+        type: 'array',
+        items: { type: 'string' },
+        description: 'Tag IDs to apply to the conversation',
+      },
+      cc: {
+        type: 'array',
+        items: { type: 'string' },
+        description: 'Email addresses to send a copy to',
+      },
+      bcc: {
+        type: 'array',
+        items: { type: 'string' },
+        description: 'Email addresses to send a hidden copy to',
+      },
+      ...attachmentsField,
+      ...authorField,
+      state: {
+        type: 'string',
+        enum: ['opened', 'closed', 'snoozed'],
+        description: 'State of the new ticket',
+        default: 'opened',
+      },
+      snoozedUntil: {
+        type: 'string',
+        description: 'ISO 8601 datetime to snooze until. Needs state snoozed. Leave out to snooze indefinitely',
+      },
+    },
+    required: ['channelId', 'to', 'subject', 'body'],
+  }),
+  handler: (args, { conversations }) => conversations.createConversation(args),
+});
+
+export const logConversation = defineTool<LogConversationArgs>({
+  name: 'logConversation',
+  setting: 'write',
+  annotations: ADDITIVE_TOOL,
+  description:
+    "Groove's Log a Conversation: creates a ticket for a contact that starts with an internal note, for example to record a phone call. Never sends email.",
+  inputSchema: ({ authorField, attachmentsField }) => ({
+    type: 'object',
+    properties: {
+      channelId: {
+        type: 'string',
+        description: 'ID of the email channel for the ticket',
+      },
+      to: {
+        type: 'string',
+        description: 'Email address of the contact. A new contact is created if needed',
+      },
+      toName: {
+        type: 'string',
+        description: 'Name of the contact (defaults to the email address)',
+      },
+      phone: {
+        type: 'string',
+        description: 'Phone number of the contact, for example when logging a call',
+      },
+      subject: {
+        type: 'string',
+        description: 'Subject of the ticket',
+      },
+      body: {
+        type: 'string',
+        description: 'Text of the internal note',
+      },
+      state: {
+        type: 'string',
+        enum: ['opened', 'closed'],
+        description: 'State of the new ticket',
+        default: 'opened',
+      },
+      assignedAgentId: {
+        type: 'string',
+        description: 'ID of agent to assign the ticket to',
+      },
+      assignedTeamId: {
+        type: 'string',
+        description: 'ID of team to assign the ticket to',
+      },
+      skipNotifications: {
+        type: 'boolean',
+        description: 'Do not notify agents about the new ticket',
+      },
+      ...attachmentsField,
+      ...authorField,
+    },
+    required: ['channelId', 'to', 'subject', 'body'],
+  }),
+  handler: (args, { conversations }) => conversations.logConversation(args),
+});
+
+export const updateConversation = defineTool<UpdateConversationArgs>({
+  name: 'updateConversation',
+  setting: 'write',
+  annotations: ADDITIVE_TOOL,
+  description: 'Update a conversation (status, assignee, tags). Can also unassign and remove tags. To delete a ticket, use deleteConversation. To mark it as spam, use markAsSpam',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      id: {
+        type: 'string',
+        description: 'Ticket number (e.g. 12345) or conversation ID',
+      },
+      state: {
+        type: 'string',
+        enum: ['opened', 'closed', 'snoozed', 'unread'],
+        description: 'New conversation state',
+      },
+      subject: {
+        type: 'string',
+        description: 'New subject',
+      },
+      contactId: {
+        type: 'string',
+        description: 'Move the ticket to this contact. The sender of existing mail stays the same',
+      },
+      channelId: {
+        type: 'string',
+        description: 'Move the ticket to this mailbox. Refused if this account has no access to it',
+      },
+      starred: {
+        type: 'boolean',
+        description: 'Star or unstar the ticket',
+      },
+      followerIds: {
+        type: 'array',
+        items: { type: 'string' },
+        description: 'Agent IDs to add as followers',
+      },
+      removeFollowerIds: {
+        type: 'array',
+        items: { type: 'string' },
+        description: 'Agent IDs to remove as followers',
+      },
+      assignedAgentId: {
+        type: 'string',
+        description: 'ID of agent to assign the conversation to',
+      },
+      assignedTeamId: {
+        type: 'string',
+        description: 'ID of team to assign the conversation to',
+      },
+      unassign: {
+        type: 'boolean',
+        description:
+          'Unassign the ticket: removes both the agent and the team. Use this unless asked to keep one of them. Add assignedAgentId or assignedTeamId to hand the ticket to someone else',
+      },
+      unassignAgent: {
+        type: 'boolean',
+        description: 'Remove only the agent. The team stays',
+      },
+      unassignTeam: {
+        type: 'boolean',
+        description: 'Remove only the team. The agent stays',
+      },
+      tagIds: {
+        type: 'array',
+        items: { type: 'string' },
+        description: 'Tag IDs to add to the conversation (existing tags are kept)',
+      },
+      removeTagIds: {
+        type: 'array',
+        items: { type: 'string' },
+        description: 'Tag IDs to remove from the conversation (other tags are kept)',
+      },
+      snoozedUntil: {
+        type: 'string',
+        description: 'ISO 8601 datetime to snooze until',
+      },
+    },
+    required: ['id'],
+  },
+  handler: (args, { conversations }) => conversations.updateConversation(args),
+});
+
+export const deleteConversation = defineTool<{ id: string }>({
+  name: 'deleteConversation',
+  setting: 'write',
+  annotations: ADDITIVE_TOOL,
+  description: 'Delete a ticket. restoreConversation brings it back with its messages and notes.',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      id: {
+        type: 'string',
+        description: 'Ticket number (e.g. 12345) or conversation ID',
+      },
+    },
+    required: ['id'],
+  },
+  handler: (args, { conversations }) => conversations.deleteConversation(args.id),
+});
+
+export const deleteConversationPermanently = defineTool<{ id: string }>({
+  name: 'deleteConversationPermanently',
+  setting: 'permanentDelete',
+  annotations: DESTRUCTIVE_TOOL,
+  description: 'Delete a ticket for good. This cannot be undone, so always confirm with the user first.',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      id: {
+        type: 'string',
+        description: 'Ticket number (e.g. 12345) or conversation ID',
+      },
+    },
+    required: ['id'],
+  },
+  handler: (args, { conversations }) => conversations.deleteConversationPermanently(args.id),
+});
+
+export const restoreConversation = defineTool<{ id: string }>({
+  name: 'restoreConversation',
+  setting: 'write',
+  annotations: ADDITIVE_TOOL,
+  description: 'Restore a ticket from spam or deleted. It gets back the state it had before, opened if that is unknown',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      id: {
+        type: 'string',
+        description: 'Ticket number (e.g. 12345) or conversation ID',
+      },
+    },
+    required: ['id'],
+  },
+  handler: (args, { conversations }) => conversations.restoreConversation(args.id),
+});
+
+export const markAsSpam = defineTool<{ id: string }>({
+  name: 'markAsSpam',
+  setting: 'write',
+  annotations: DESTRUCTIVE_TOOL,
+  description:
+    'Mark a ticket as spam. Groove also blacklists the sender, so their future mail to any mailbox is marked as spam too. Always confirm with the user first. restoreConversation brings the ticket back, but the blacklist can only be undone in the Groove settings.',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      id: {
+        type: 'string',
+        description: 'Ticket number (e.g. 12345) or conversation ID',
+      },
+    },
+    required: ['id'],
+  },
+  handler: (args, { conversations }) => conversations.markAsSpam(args.id),
+});
+
+export const forwardConversation = defineTool<ForwardConversationArgs>({
+  name: 'forwardConversation',
+  setting: 'send',
+  annotations: DESTRUCTIVE_TOOL,
+  description:
+    'SENDS AN EMAIL IMMEDIATELY: forwards a ticket to the given addresses. The ticket keeps its state, and only gets a new subject if you pass one. Use only when the user explicitly asks.',
+  inputSchema: ({ attachmentsField }) => ({
+    type: 'object',
+    properties: {
+      conversationId: {
+        type: 'string',
+        description: 'Ticket number (e.g. 12345) or conversation ID',
+      },
+      to: {
+        type: 'array',
+        items: { type: 'string' },
+        description: 'Email addresses to forward to',
+      },
+      body: {
+        type: 'string',
+        description: 'Message to add to the forward',
+      },
+      subject: {
+        type: 'string',
+        description: 'New subject. This also renames the ticket',
+      },
+      cc: {
+        type: 'array',
+        items: { type: 'string' },
+        description: 'Email addresses to send a copy to',
+      },
+      bcc: {
+        type: 'array',
+        items: { type: 'string' },
+        description: 'Email addresses to send a hidden copy to',
+      },
+      ...attachmentsField,
+    },
+    required: ['conversationId', 'to', 'body'],
+  }),
+  handler: (args, { conversations }) => conversations.forwardConversation(args),
+});
+
+export const mergeConversations = defineTool<MergeConversationsArgs>({
+  name: 'mergeConversations',
+  setting: 'merge',
+  annotations: DESTRUCTIVE_TOOL,
+  description:
+    'Permanently merge one ticket into another. This cannot be undone, so always confirm with the user first. ' +
+    'The source ticket disappears. The target keeps its contact, subject and assignee. Replies and notes move over and tags are combined. ' +
+    'Drafts on the source are deleted, and an open source reopens the target',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      sourceId: {
+        type: 'string',
+        description: 'Ticket that disappears: number (e.g. 12345) or conversation ID',
+      },
+      targetId: {
+        type: 'string',
+        description: 'Ticket that stays: number (e.g. 12345) or conversation ID',
+      },
+      allowDifferentContacts: {
+        type: 'boolean',
+        description: 'Merge even though the tickets have different contacts. Only after the user agreed',
+      },
+      discardDrafts: {
+        type: 'boolean',
+        description: 'Merge even though the source has drafts, which get deleted. Only after the user agreed',
+      },
+    },
+    required: ['sourceId', 'targetId'],
+  },
+  handler: (args, { conversations }) => conversations.mergeConversations(args),
+});
+
+export const closeConversation = defineTool<{ id: string }>({
+  name: 'closeConversation',
+  setting: 'write',
+  annotations: ADDITIVE_TOOL,
+  description: 'Close a conversation',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      id: {
+        type: 'string',
+        description: 'Ticket number (e.g. 12345) or conversation ID',
+      },
+    },
+    required: ['id'],
+  },
+  handler: (args, { conversations }) => conversations.closeConversation(args.id),
+});
