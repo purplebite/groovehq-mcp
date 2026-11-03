@@ -41,10 +41,10 @@ Both repos use Groove's REST API for conversations. This one runs on GraphQL onl
 - `mergeContacts`: merge a typo or duplicate contact into the right one. This can't be undone
 - `deleteContact`, `deleteContacts`: delete contacts without tickets, which also removes them from recipient suggestions. This can't be undone
 - `listCompanies`, `updateCompany`: find companies, and change a company's name or extra domains
-- `listAgents`, `getAgent`
+- `listAgents`, `getAgent`: agents and the teams they're in
 - `listChannels`, `getChannel`
 - `listFolders`: see the Smart Folders you can use in `listConversations`
-- `listTags`, `listTeams`
+- `listTags`, `listTeams`. With `includeMembers`, `listTeams` also lists who is in each team
 - `searchKbArticles`
 
 Published knowledge base articles also show up as MCP resources.

@@ -16,7 +16,7 @@ export class AgentTools {
     while (hasNextPage) {
       const response = await this.client.request<{
         agents: {
-          nodes: Agent[];
+          nodes: Array<Omit<Agent, 'teams'> & { teams?: { nodes: Array<{ id: string; name: string }> } | null }>;
           pageInfo: {
             hasNextPage: boolean;
             endCursor: string;
@@ -24,7 +24,9 @@ export class AgentTools {
         };
       }>(queries.listAgents, { first: 100, after });
 
-      agents.push(...response.agents.nodes);
+      for (const { teams, ...agent } of response.agents.nodes) {
+        agents.push({ ...agent, teams: teams?.nodes ?? [] });
+      }
       hasNextPage = response.agents.pageInfo.hasNextPage;
       if (hasNextPage) after = nextPage(response.agents.pageInfo.endCursor);
     }
@@ -51,7 +53,7 @@ export const listAgents = defineTool({
   name: 'listAgents',
   setting: 'read',
   annotations: READ_TOOL,
-  description: 'List all agents in the organization',
+  description: 'List all agents in the organization, with the teams each one is in',
   inputSchema: {
     type: 'object',
     properties: {},
@@ -63,7 +65,7 @@ export const getAgent = defineTool<{ id: string }>({
   name: 'getAgent',
   setting: 'read',
   annotations: READ_TOOL,
-  description: 'Get detailed information about a specific agent',
+  description: 'Get detailed information about a specific agent, including the teams they are in',
   inputSchema: {
     type: 'object',
     properties: {

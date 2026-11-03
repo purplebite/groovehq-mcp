@@ -92,12 +92,14 @@ export interface Agent {
   avatarUrl?: string;
   role: 'admin' | 'agent';
   state: string;
+  teams?: Array<{ id: string; name: string }>;
 }
 
 export interface Team {
   id: string;
   name: string;
   description?: string;
+  members?: Array<{ id: string; name: string; email: string }>;
 }
 
 export interface FolderOwner {

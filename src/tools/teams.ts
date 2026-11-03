@@ -7,7 +7,7 @@ import { defineTool, READ_TOOL } from './definition.js';
 export class TeamTools {
   constructor(private client: GrooveClient) {}
 
-  async listTeams(): Promise<Team[]> {
+  async listTeams(args: { includeMembers?: boolean } = {}): Promise<Team[]> {
     const teams: Team[] = [];
     let after: string | undefined;
     let hasNextPage = true;
@@ -16,15 +16,23 @@ export class TeamTools {
     while (hasNextPage) {
       const response = await this.client.request<{
         teams: {
-          nodes: Team[];
+          nodes: Array<Team & { agents?: { nodes: Array<{ id: string; name: string; email: string }>; pageInfo: { hasNextPage: boolean } } }>;
           pageInfo: {
             hasNextPage: boolean;
             endCursor: string;
           };
         };
-      }>(queries.listTeams, { first: 100, after });
+      }>(args.includeMembers ? queries.listTeamsWithMembers : queries.listTeams, { first: 100, after });
 
-      teams.push(...response.teams.nodes);
+      for (const { agents, ...team } of response.teams.nodes) {
+        if (!args.includeMembers) {
+          teams.push(team);
+          continue;
+        }
+        // Rather an error than a team that silently looks smaller than it is
+        if (agents?.pageInfo.hasNextPage) throw new Error(`Team ${team.name} has more than 100 members, which listTeams can't show`);
+        teams.push({ ...team, members: agents?.nodes ?? [] });
+      }
       hasNextPage = response.teams.pageInfo.hasNextPage;
       if (hasNextPage) after = nextPage(response.teams.pageInfo.endCursor);
     }
@@ -33,14 +41,19 @@ export class TeamTools {
   }
 }
 
-export const listTeams = defineTool({
+export const listTeams = defineTool<{ includeMembers?: boolean }>({
   name: 'listTeams',
   setting: 'read',
   annotations: READ_TOOL,
-  description: 'List all teams, for filtering or assigning tickets',
+  description: 'List all teams, for filtering or assigning tickets. With includeMembers, each team also lists its agents',
   inputSchema: {
     type: 'object',
-    properties: {},
+    properties: {
+      includeMembers: {
+        type: 'boolean',
+        description: 'Also list the agents in each team (id, name, email)',
+      },
+    },
   },
-  handler: (_args, { teams }) => teams.listTeams(),
+  handler: (args, { teams }) => teams.listTeams(args),
 });

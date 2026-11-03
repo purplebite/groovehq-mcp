@@ -405,6 +405,12 @@ export const queries = {
       agents(first: $first, after: $after) {
         nodes {
           ${AGENT_FIELDS}
+          teams(first: 100) {
+            nodes {
+              id
+              name
+            }
+          }
         }
         pageInfo {
           hasNextPage
@@ -438,6 +444,32 @@ export const queries = {
           id
           name
           description
+        }
+        pageInfo {
+          hasNextPage
+          endCursor
+        }
+      }
+    }
+  `,
+
+  listTeamsWithMembers: `
+    query ListTeamsWithMembers($first: Int, $after: String) {
+      teams(first: $first, after: $after) {
+        nodes {
+          id
+          name
+          description
+          agents(first: 100) {
+            nodes {
+              id
+              name
+              email
+            }
+            pageInfo {
+              hasNextPage
+            }
+          }
         }
         pageInfo {
           hasNextPage

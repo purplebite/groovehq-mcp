@@ -2712,7 +2712,7 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
       "annotations": {
         "readOnlyHint": true,
       },
-      "description": "Get detailed information about a specific agent",
+      "description": "Get detailed information about a specific agent, including the teams they are in",
       "inputSchema": {
         "properties": {
           "id": {
@@ -2788,7 +2788,7 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
       "annotations": {
         "readOnlyHint": true,
       },
-      "description": "List all agents in the organization",
+      "description": "List all agents in the organization, with the teams each one is in",
       "inputSchema": {
         "properties": {},
         "type": "object",
@@ -3064,9 +3064,14 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
       "annotations": {
         "readOnlyHint": true,
       },
-      "description": "List all teams, for filtering or assigning tickets",
+      "description": "List all teams, for filtering or assigning tickets. With includeMembers, each team also lists its agents",
       "inputSchema": {
-        "properties": {},
+        "properties": {
+          "includeMembers": {
+            "description": "Also list the agents in each team (id, name, email)",
+            "type": "boolean",
+          },
+        },
         "type": "object",
       },
       "name": "listTeams",

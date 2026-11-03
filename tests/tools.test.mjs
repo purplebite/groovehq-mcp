@@ -443,3 +443,39 @@ describe('moving a ticket to another mailbox', () => {
     expect(result.operations).toEqual([]);
   });
 });
+
+describe('team membership', () => {
+  const member = { id: 'ag_1', name: 'Agent', email: 'agent@example.com' };
+  const withMembers = (hasNextPage = false) => query =>
+    query.includes('ListTeamsWithMembers')
+      ? { data: { teams: { nodes: [{ id: 'tm_1', name: 'Team', agents: { nodes: [member], pageInfo: { hasNextPage } } }], pageInfo: page } } }
+      : undefined;
+
+  test('listTeams leaves members out by default', async () => {
+    const result = await call('listTeams', {});
+    expect(result.operations).toEqual(['ListTeams']);
+    expect(result.json[0].members).toBeUndefined();
+  });
+
+  test('listTeams lists members with includeMembers', async () => {
+    const result = await call('listTeams', { includeMembers: true }, ALL_ON, withMembers());
+    expect(result.operations).toEqual(['ListTeamsWithMembers']);
+    expect(result.json).toEqual([{ id: 'tm_1', name: 'Team', members: [member] }]);
+  });
+
+  test('a team with more than 100 members is an error, not a short list', async () => {
+    const result = await call('listTeams', { includeMembers: true }, ALL_ON, withMembers(true));
+    expect(result.isError).toBe(true);
+    expect(result.json.error).toContain('more than 100 members');
+  });
+
+  test.each([['listAgents', {}], ['getAgent', { id: 'ag_1' }]])('%s lists the teams of an agent', async (tool, args) => {
+    const answer = query =>
+      query.includes('ListAgents')
+        ? { data: { agents: { nodes: [{ ...agent, teams: { nodes: [{ id: 'tm_1', name: 'Team' }] } }], pageInfo: page } } }
+        : undefined;
+    const result = await call(tool, args, ALL_ON, answer);
+    const found = Array.isArray(result.json) ? result.json[0] : result.json;
+    expect(found.teams).toEqual([{ id: 'tm_1', name: 'Team' }]);
+  });
+});
