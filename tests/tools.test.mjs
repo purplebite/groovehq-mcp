@@ -153,7 +153,9 @@ describe('normal path', () => {
     await client.connect(clientSide);
     const { tools } = await client.listTools();
     await client.close();
-    expect(normalPaths.map(([name]) => name).sort()).toEqual(tools.map(tool => tool.name).sort());
+    // getAttachment downloads a file instead of asking Groove's API; tests/attachment-reader.test.mjs covers it
+    const testedElsewhere = ['getAttachment'];
+    expect([...normalPaths.map(([name]) => name), ...testedElsewhere].sort()).toEqual(tools.map(tool => tool.name).sort());
   });
 
   test.each(normalPaths)('%s', async (name, args, operation, check) => {

@@ -15,11 +15,13 @@ import * as tags from './tools/tags.js';
 import * as teams from './tools/teams.js';
 import * as folders from './tools/folders.js';
 import * as drafts from './tools/drafts.js';
+import * as attachmentReader from './tools/attachment-reader/index.js';
 import * as kb from './resources/kb-articles.js';
 import {
   ATTACHMENTS_SCHEMA,
   AUTHOR_SCHEMA,
   InputSchema,
+  isMcpContent,
   OptionalFields,
   PropertySchema,
   Tool,
@@ -37,9 +39,10 @@ export interface GrooveServerOptions {
   allowMerge?: boolean;
   allowPermanentDelete?: boolean;
   allowAttachments?: boolean;
+  readAttachments?: boolean;
 }
 
-const BOOLEAN_OPTIONS = ['readOnly', 'allowSend', 'allowSendAs', 'allowMerge', 'allowPermanentDelete', 'allowAttachments'] as const;
+const BOOLEAN_OPTIONS = ['readOnly', 'allowSend', 'allowSendAs', 'allowMerge', 'allowPermanentDelete', 'allowAttachments', 'readAttachments'] as const;
 
 // tools/list returns them in this order
 const TOOLS: Tool[] = [
@@ -60,6 +63,7 @@ const TOOLS: Tool[] = [
   conversations.mergeConversations,
   conversations.closeConversation,
   messages.listMessages,
+  attachmentReader.getAttachment,
   messages.sendMessage,
   messages.createNote,
   drafts.listDrafts,
@@ -134,6 +138,8 @@ export function createGrooveServer(opts: GrooveServerOptions): Server {
   const allowMerge = opts.allowMerge !== false && !readOnly;
   const allowPermanentDelete = opts.allowPermanentDelete === true && !readOnly;
   const allowAttachments = opts.allowAttachments === true && !readOnly;
+  // Reading only, so read-only mode leaves it on
+  const readAttachments = opts.readAttachments !== false;
 
   const fields: OptionalFields = {
     authorField: allowSendAs ? { authorId: AUTHOR_SCHEMA } : {},
@@ -150,6 +156,8 @@ export function createGrooveServer(opts: GrooveServerOptions): Server {
         return allowPermanentDelete;
       case 'write':
         return !readOnly;
+      case 'readAttachments':
+        return readAttachments;
       default:
         return true;
     }
@@ -168,6 +176,7 @@ export function createGrooveServer(opts: GrooveServerOptions): Server {
     folders: new folders.FolderTools(grooveClient),
     drafts: new drafts.DraftTools(grooveClient),
     kb: kbResources,
+    attachmentReader: new attachmentReader.AttachmentReader(),
   };
 
   const server = new Server(
@@ -201,13 +210,15 @@ export function createGrooveServer(opts: GrooveServerOptions): Server {
 
     try {
       if (!isEnabled(tool)) {
-        const reason = readOnly
-          ? 'GROOVE_READ_ONLY is on'
-          : tool?.setting === 'merge'
-            ? 'merging is turned off with GROOVE_ALLOW_MERGE=0'
-            : tool?.setting === 'permanentDelete'
-              ? 'it needs GROOVE_ALLOW_PERMANENT_DELETE=1'
-              : 'it sends email, which needs GROOVE_ALLOW_SEND=1';
+        const reason = tool?.setting === 'readAttachments'
+          ? 'reading attachments is turned off with GROOVE_READ_ATTACHMENTS=0'
+          : readOnly
+            ? 'GROOVE_READ_ONLY is on'
+            : tool?.setting === 'merge'
+              ? 'merging is turned off with GROOVE_ALLOW_MERGE=0'
+              : tool?.setting === 'permanentDelete'
+                ? 'it needs GROOVE_ALLOW_PERMANENT_DELETE=1'
+                : 'it sends email, which needs GROOVE_ALLOW_SEND=1';
         throw new Error(`${name} is disabled: ${reason}`);
       }
 
@@ -230,6 +241,7 @@ export function createGrooveServer(opts: GrooveServerOptions): Server {
       checkRequired(schema, args);
 
       const result = await tool.handler(args, context);
+      if (isMcpContent(result)) return { content: result.content };
       return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';

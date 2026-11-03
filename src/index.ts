@@ -30,6 +30,7 @@ const server = createGrooveServer({
   allowMerge: flag('GROOVE_ALLOW_MERGE', true),
   allowPermanentDelete: flag('GROOVE_ALLOW_PERMANENT_DELETE', false),
   allowAttachments: flag('GROOVE_ALLOW_ATTACHMENTS', false),
+  readAttachments: flag('GROOVE_READ_ATTACHMENTS', true),
 });
 const grooveClient = new GrooveClient(apiToken, apiUrl);
 

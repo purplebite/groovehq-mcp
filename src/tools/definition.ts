@@ -8,6 +8,7 @@ import type { TeamTools } from './teams.js';
 import type { FolderTools } from './folders.js';
 import type { DraftTools } from './drafts.js';
 import type { KnowledgeBaseResources } from '../resources/kb-articles.js';
+import type { AttachmentReader } from './attachment-reader/index.js';
 
 // claude.ai groups tools and sets approval by these. destructiveHint defaults to true, so always set it
 export const READ_TOOL = { readOnlyHint: true };
@@ -37,9 +38,10 @@ export const ATTACHMENTS_SCHEMA = {
 /**
  * The setting a tool needs:
  * read always runs, write needs GROOVE_READ_ONLY off, send needs GROOVE_ALLOW_SEND,
- * merge needs GROOVE_ALLOW_MERGE, permanentDelete needs GROOVE_ALLOW_PERMANENT_DELETE
+ * merge needs GROOVE_ALLOW_MERGE, permanentDelete needs GROOVE_ALLOW_PERMANENT_DELETE,
+ * readAttachments needs GROOVE_READ_ATTACHMENTS (on by default, also when read-only)
  */
-export type Setting = 'read' | 'write' | 'send' | 'merge' | 'permanentDelete';
+export type Setting = 'read' | 'write' | 'send' | 'merge' | 'permanentDelete' | 'readAttachments';
 
 export interface PropertySchema {
   type?: string;
@@ -70,6 +72,28 @@ export interface ToolContext {
   folders: FolderTools;
   drafts: DraftTools;
   kb: KnowledgeBaseResources;
+  attachmentReader: AttachmentReader;
+}
+
+export type ContentBlock =
+  | { type: 'text'; text: string }
+  | { type: 'image'; data: string; mimeType: string };
+
+// A tool result marked with this goes out as MCP content as is. Every other result is sent as JSON,
+// so a field that happens to be called content never changes how a result looks
+const MCP_CONTENT = Symbol('mcpContent');
+
+export interface McpContent {
+  [MCP_CONTENT]: true;
+  content: ContentBlock[];
+}
+
+export function mcpContent(content: ContentBlock[]): McpContent {
+  return { [MCP_CONTENT]: true, content };
+}
+
+export function isMcpContent(value: unknown): value is McpContent {
+  return typeof value === 'object' && value !== null && (value as Partial<McpContent>)[MCP_CONTENT] === true;
 }
 
 export interface ToolDefinition<Args> {

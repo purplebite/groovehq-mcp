@@ -27,6 +27,7 @@ Both repos use Groove's REST API for conversations. This one runs on GraphQL onl
 **Messages**
 
 - `listMessages`: every message and note on a ticket, oldest first. Ask for only the first or last few, and for plain text without the HTML
+- `getAttachment`: read an attachment from `listMessages`, up to 10 MB. PDFs come back as text, images as images. Groove's robots.txt blocks automated access to its file links, so clients like Claude can't open them themselves
 - `sendMessage`: send an email reply
 - `undoSend`: cancel a mail right after sending it
 - `createNote`: leave an internal note
@@ -83,7 +84,7 @@ import { createGrooveServer } from 'groovehq-mcp/server';
 const server = createGrooveServer({ token: 'your_token_here', readOnly: true });
 ```
 
-`allowSend`, `allowSendAs`, `allowMerge`, `allowPermanentDelete`, `allowAttachments`, and `apiUrl` are optional too. Sending, acting as a colleague, permanent deletion, and attachments stay off unless you set them to `true`, merging stays on unless you set `allowMerge: false`, and `readOnly` always wins. These options must be real booleans: anything else, like the string `'true'`, throws an error.
+`allowSend`, `allowSendAs`, `allowMerge`, `allowPermanentDelete`, `allowAttachments`, `readAttachments`, and `apiUrl` are optional too. Sending, acting as a colleague, permanent deletion, and attachments stay off unless you set them to `true`, merging and reading attachments stay on unless you set `allowMerge: false` or `readAttachments: false`, and `readOnly` always wins over the options that write. These options must be real booleans: anything else, like the string `'true'`, throws an error.
 
 The library doesn't read the `GROOVE_` settings, so pass each option yourself. It also has no login, so a hosted server has two options: keep one token on the server and put your own authentication in front of it, or have each user send their own Groove API key and pass that to `createGrooveServer`.
 
@@ -98,6 +99,7 @@ This server can send real email to real customers. A few things keep that honest
 - **Acting as a colleague is off by default.** Mail and notes go out as the agent who owns the API token. Set `GROOVE_ALLOW_SEND_AS=1` to pass `authorId` to `createConversation`, `sendMessage`, `createNote`, or `logConversation`. The server first checks that this agent exists and is active, because Groove can otherwise use the token owner without saying so.
 - **Attachments are off by default.** Set `GROOVE_ALLOW_ATTACHMENTS=1` to attach files from a link or as base64, up to 20 MB each and at most 25 per message. Base64 goes through the model, so it suits small files, and one message can carry about 30 MB of it.
 - **Links carry a risk.** The server fetches links itself, so a model misled by a customer email could put ticket data in a link and send it to an outside server. Links must use `https`, and local or private addresses are refused. The server also looks up where a name points, including after a redirect, and refuses it if any of its addresses is private. The download looks the name up again, so a name that changes in between (DNS rebinding) can still get through. Where Node's `dns` module is missing, only the address itself is checked.
+- **Reading attachments stays within Groove.** `getAttachment` only fetches Groove's own download links (`https://files.groovehq.com/f/download/...`), follows no redirects, and never sends your token. Anyone with such a link can download the file, so treat the links like the files. Text in an attachment comes from whoever sent it, just like an email, and can contain instructions aimed at the model. Set `GROOVE_READ_ATTACHMENTS=0` to leave the tool out.
 - **Spam reaches past one ticket.** Groove blacklists the sender of a ticket marked as spam, so their future mail to any mailbox is marked as spam too. That's why `markAsSpam` is a separate tool marked as destructive. `restoreConversation` brings the ticket back, but the sender stays blacklisted until you remove the address in Groove's settings.
 - **Merging is permanent.** Only the target ticket stays, with its own contact, subject, and assignee. Replies and notes move over, tags are combined, and an open ticket reopens the target. `mergeConversations` is marked as destructive, and it refuses tickets with different contacts or your own drafts on the merged ticket unless told otherwise. Set `GROOVE_ALLOW_MERGE=0` to turn off merging tickets and contacts.
 - **Deleting is limited.** A deleted ticket can always be restored. Deleting one for good takes a separate tool, `deleteConversationPermanently`, which is marked as destructive and only appears when you set `GROOVE_ALLOW_PERMANENT_DELETE=1`. A deleted contact is gone for good, so contacts with tickets can't be deleted at all: merge them first with `mergeContacts`. Other contacts are only deleted with `confirm: true`, at most 100 per call.

@@ -283,7 +283,7 @@ describe('deleting tickets', () => {
 });
 
 describe('safety options', () => {
-  test.each(['readOnly', 'allowSend', 'allowSendAs', 'allowMerge', 'allowPermanentDelete', 'allowAttachments'])('%s refuses anything but a boolean', option => {
+  test.each(['readOnly', 'allowSend', 'allowSendAs', 'allowMerge', 'allowPermanentDelete', 'allowAttachments', 'readAttachments'])('%s refuses anything but a boolean', option => {
     for (const value of ['true', 'false', '1', 1, 0, null]) {
       expect(() => createGrooveServer({ token: TOKEN, [option]: value })).toThrow('must be true or false');
     }
@@ -311,6 +311,7 @@ describe('safety options', () => {
     ['GROOVE_ALLOW_MERGE', 'false'],
     ['GROOVE_ALLOW_PERMANENT_DELETE', 'TRUE'],
     ['GROOVE_ALLOW_ATTACHMENTS', 'true'],
+    ['GROOVE_READ_ATTACHMENTS', 'off'],
     ['GROOVE_READ_ONLY', ''],
     ['GROOVE_ALLOW_MERGE', ''],
   ])('%s=%s stops the server', async (name, value) => {

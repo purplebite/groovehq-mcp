@@ -4,7 +4,7 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { createGrooveServer } from '../dist/server.js';
 
 const READ = [
-  'getAgent', 'getChannel', 'getContact', 'getConversation', 'listAgents', 'listChannels', 'listCompanies',
+  'getAgent', 'getAttachment', 'getChannel', 'getContact', 'getConversation', 'listAgents', 'listChannels', 'listCompanies',
   'listContacts', 'listConversations', 'listDrafts', 'listFolders', 'listMessages', 'listTags', 'listTeams',
   'searchKbArticles',
 ];
