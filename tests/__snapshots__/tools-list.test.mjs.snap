@@ -2795,7 +2795,7 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
       "annotations": {
         "readOnlyHint": true,
       },
-      "description": "Read the content of an attachment, up to 10 MB. Pass the downloadUrl that listMessages returns for it. PDFs come back as text, images as images",
+      "description": "Read the content of an attachment, up to 10 MB. Pass the downloadUrl that listMessages returns for it. PDF, Word, Excel and PowerPoint files come back as text, images as images, and a zip as a list of its files",
       "inputSchema": {
         "properties": {
           "downloadUrl": {

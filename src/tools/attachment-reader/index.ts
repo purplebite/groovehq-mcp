@@ -2,12 +2,13 @@
 // Everything for it lives in this folder, so it can be removed in one go
 import { ContentBlock, defineTool, mcpContent, READ_TOOL } from '../definition.js';
 import { download } from './download.js';
+import { isZip, readZip, ZIP_TYPES, zipKind } from './office.js';
 import { pdfText } from './pdf.js';
 
 const MAX_CHARS = 100000;
 const IMAGE_MAX_BYTES = 3.5 * 1024 * 1024; // Claude takes images up to 5 MB, and base64 adds a third
 const IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
-const TEXT_TYPES = ['application/json', 'image/svg+xml'];
+const TEXT_TYPES = ['application/json', 'image/svg+xml', 'message/rfc822'];
 
 const EXTENSIONS: Record<string, string> = {
   pdf: 'application/pdf',
@@ -20,6 +21,7 @@ const EXTENSIONS: Record<string, string> = {
   txt: 'text/plain',
   csv: 'text/csv',
   json: 'application/json',
+  eml: 'message/rfc822',
 };
 
 // Groove says what a file is, but storage often answers application/octet-stream
@@ -56,9 +58,17 @@ export class AttachmentReader {
     const { bytes, fileName, declaredType } = await download(args.downloadUrl);
     // Measured now: pdf.js takes over the buffer while it reads, which leaves it empty
     const size = bytes.length;
-    const type = typeOf(declaredType, bytes, fileName);
+    let type = typeOf(declaredType, bytes, fileName);
+    // Word, Excel, PowerPoint and plain zips are recognised by what's inside
+    const kind = isZip(bytes) ? zipKind(bytes) : undefined;
+    if (kind && ['application/octet-stream', 'application/zip', 'application/x-zip-compressed'].includes(type)) type = ZIP_TYPES[kind];
     const header = (extra?: string) => ['File: ' + fileName, 'Type: ' + type, extra, `Size: ${size} bytes`].filter(Boolean).join(' | ');
     const text = (extra: string | undefined, body: string) => mcpContent([{ type: 'text', text: `${header(extra)}\n\n${body}` }]);
+
+    if (kind) {
+      const read = readZip(bytes, kind);
+      return text(read.detail, truncate(read.text));
+    }
 
     if (type === 'application/pdf') {
       const pdf = await pdfText(bytes);
@@ -86,7 +96,7 @@ export const getAttachment = defineTool<{ downloadUrl: string }>({
   name: 'getAttachment',
   setting: 'readAttachments',
   annotations: READ_TOOL,
-  description: 'Read the content of an attachment, up to 10 MB. Pass the downloadUrl that listMessages returns for it. PDFs come back as text, images as images',
+  description: 'Read the content of an attachment, up to 10 MB. Pass the downloadUrl that listMessages returns for it. PDF, Word, Excel and PowerPoint files come back as text, images as images, and a zip as a list of its files',
   inputSchema: {
     type: 'object',
     properties: {
