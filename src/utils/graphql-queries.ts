@@ -174,6 +174,8 @@ export const queries = {
           hasNextPage
           endCursor
         }
+        totalCount
+        totalCountCapped
       }
     }
   `,

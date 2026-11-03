@@ -40,6 +40,8 @@ interface ListConversationsResult {
     hasNextPage: boolean;
     endCursor: string | null;
   };
+  totalCount: number;
+  totalCountCapped: boolean;
 }
 
 interface UpdateConversationArgs {
@@ -159,6 +161,8 @@ export class ConversationTools {
           hasNextPage: boolean;
           endCursor: string | null;
         };
+        totalCount: number;
+        totalCountCapped: boolean;
       };
     }>(queries.listConversations, { first: args.limit || 20, after: args.after, filter, orderBy }).catch((error: Error) => {
       if (!args.folderId) throw error;
@@ -173,6 +177,8 @@ export class ConversationTools {
     return {
       conversations: response.conversations.nodes,
       pageInfo: response.conversations.pageInfo,
+      totalCount: response.conversations.totalCount,
+      totalCountCapped: response.conversations.totalCountCapped,
     };
   }
 
@@ -555,7 +561,7 @@ export const listConversations = defineTool<ListConversationsArgs>({
   name: 'listConversations',
   setting: 'read',
   annotations: READ_TOOL,
-  description: 'List conversations with optional filters. Returns one page; if pageInfo.hasNextPage is true, more results exist.',
+  description: 'List conversations with optional filters. Returns one page; if pageInfo.hasNextPage is true, more results exist. totalCount is the number of matching tickets across all pages, so for a count, ask for limit 1. If totalCountCapped is true, Groove stopped counting and the real number is higher',
   inputSchema: {
     type: 'object',
     properties: {

@@ -505,3 +505,15 @@ describe('listConversations by date and in order', () => {
     expect(sent().orderBy).toBeUndefined();
   });
 });
+
+describe('listConversations counts', () => {
+  test('passes on the total and whether Groove capped it', async () => {
+    const answer = query =>
+      query.includes('ListConversations')
+        ? { data: { conversations: { nodes: [ticket], pageInfo: page, totalCount: 6805, totalCountCapped: false } } }
+        : undefined;
+    const result = await call('listConversations', { limit: 1 }, ALL_ON, answer);
+    expect(result.json).toMatchObject({ totalCount: 6805, totalCountCapped: false });
+    expect(result.json.conversations).toHaveLength(1);
+  });
+});

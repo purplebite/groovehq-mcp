@@ -2936,7 +2936,7 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
       "annotations": {
         "readOnlyHint": true,
       },
-      "description": "List conversations with optional filters. Returns one page; if pageInfo.hasNextPage is true, more results exist.",
+      "description": "List conversations with optional filters. Returns one page; if pageInfo.hasNextPage is true, more results exist. totalCount is the number of matching tickets across all pages, so for a count, ask for limit 1. If totalCountCapped is true, Groove stopped counting and the real number is higher",
       "inputSchema": {
         "properties": {
           "after": {
