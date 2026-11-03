@@ -2959,6 +2959,14 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
             "description": "Filter by contact ID",
             "type": "string",
           },
+          "createdAfter": {
+            "description": "Only tickets created on or after this moment, as an ISO date or date-time (2026-10-01 means midnight UTC)",
+            "type": "string",
+          },
+          "createdBefore": {
+            "description": "Only tickets created on or before this moment, as an ISO date or date-time. For all of October, use 2026-10-31T23:59:59Z",
+            "type": "string",
+          },
           "folderId": {
             "description": "Only tickets in this Smart Folder. Get the ID from listFolders. Don't combine it with channelId, unless that mailbox is listed for the folder.",
             "type": "string",
@@ -2971,6 +2979,32 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
             "default": 20,
             "description": "Maximum number of conversations to return per page",
             "type": "number",
+          },
+          "orderBy": {
+            "description": "Sort order. STATE_CHANGED_AT with state closed lists recently closed tickets first; each ticket's stateUpdatedAt is its latest state change",
+            "properties": {
+              "direction": {
+                "default": "DESC",
+                "enum": [
+                  "ASC",
+                  "DESC",
+                ],
+                "type": "string",
+              },
+              "field": {
+                "enum": [
+                  "CREATED_AT",
+                  "UPDATED_AT",
+                  "STATE_CHANGED_AT",
+                  "LAST_UNANSWERED_USER_MESSAGE_AT",
+                ],
+                "type": "string",
+              },
+            },
+            "required": [
+              "field",
+            ],
+            "type": "object",
           },
           "state": {
             "description": "Filter by conversation state. opened also includes unread, but leaves out snoozed: ask for snoozed separately to see every ticket that still needs work",

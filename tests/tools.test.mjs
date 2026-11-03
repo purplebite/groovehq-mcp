@@ -479,3 +479,29 @@ describe('team membership', () => {
     expect(found.teams).toEqual([{ id: 'tm_1', name: 'Team' }]);
   });
 });
+
+describe('listConversations by date and in order', () => {
+  const sent = () => requests.find(r => r.operation === 'ListConversations').variables;
+
+  test('dates go to Groove as full date-times', async () => {
+    await call('listConversations', { createdAfter: '2026-10-01', createdBefore: '2026-10-31T23:59:59Z' });
+    expect(sent().filter).toEqual({ afterCreatedAt: '2026-10-01T00:00:00.000Z', beforeCreatedAt: '2026-10-31T23:59:59.000Z' });
+  });
+
+  test('a date that is not a date is refused before Groove is asked', async () => {
+    const result = await call('listConversations', { createdAfter: 'last week' });
+    expect(result.isError).toBe(true);
+    expect(result.json.error).toContain('createdAfter must be a date');
+    expect(result.operations).toEqual([]);
+  });
+
+  test('orderBy is passed on, newest first by default', async () => {
+    await call('listConversations', { state: 'closed', orderBy: { field: 'STATE_CHANGED_AT' } });
+    expect(sent().orderBy).toEqual({ field: 'STATE_CHANGED_AT', direction: 'DESC' });
+  });
+
+  test('without orderBy, Groove keeps its own order', async () => {
+    await call('listConversations', {});
+    expect(sent().orderBy).toBeUndefined();
+  });
+});

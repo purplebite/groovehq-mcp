@@ -17,8 +17,21 @@ interface ListConversationsArgs {
   folderId?: string;
   tagIds?: string[];
   keywords?: string;
+  createdAfter?: string;
+  createdBefore?: string;
+  orderBy?: {
+    field: 'CREATED_AT' | 'UPDATED_AT' | 'STATE_CHANGED_AT' | 'LAST_UNANSWERED_USER_MESSAGE_AT';
+    direction?: 'ASC' | 'DESC';
+  };
   limit?: number;
   after?: string;
+}
+
+// Groove wants a full date and time; a date alone counts as midnight UTC
+function toDateTime(key: string, value: string): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) throw new Error(`${key} must be a date, like 2026-10-01 or 2026-10-01T09:00:00Z`);
+  return date.toISOString();
 }
 
 interface ListConversationsResult {
@@ -123,6 +136,8 @@ export class ConversationTools {
       folderId?: string;
       tags?: string[];
       keywords?: string;
+      afterCreatedAt?: string;
+      beforeCreatedAt?: string;
     } = {};
 
     if (args.state) filter.state = args.state.toUpperCase();
@@ -133,6 +148,9 @@ export class ConversationTools {
     if (args.folderId) filter.folderId = args.folderId;
     if (args.tagIds) filter.tags = args.tagIds;
     if (args.keywords) filter.keywords = args.keywords;
+    if (args.createdAfter) filter.afterCreatedAt = toDateTime('createdAfter', args.createdAfter);
+    if (args.createdBefore) filter.beforeCreatedAt = toDateTime('createdBefore', args.createdBefore);
+    const orderBy = args.orderBy ? { field: args.orderBy.field, direction: args.orderBy.direction ?? 'DESC' } : undefined;
 
     const response = await this.client.request<{
       conversations: {
@@ -142,7 +160,7 @@ export class ConversationTools {
           endCursor: string | null;
         };
       };
-    }>(queries.listConversations, { first: args.limit || 20, after: args.after, filter }).catch((error: Error) => {
+    }>(queries.listConversations, { first: args.limit || 20, after: args.after, filter, orderBy }).catch((error: Error) => {
       if (!args.folderId) throw error;
       if (error.message.includes('No folder found')) throw new Error(`Folder not found: ${args.folderId}`);
       // Groove gives this for a folder that's turned off or limited to other agents
@@ -574,6 +592,30 @@ export const listConversations = defineTool<ListConversationsArgs>({
       keywords: {
         type: 'string',
         description: 'Full-text search across conversations',
+      },
+      createdAfter: {
+        type: 'string',
+        description: 'Only tickets created on or after this moment, as an ISO date or date-time (2026-10-01 means midnight UTC)',
+      },
+      createdBefore: {
+        type: 'string',
+        description: 'Only tickets created on or before this moment, as an ISO date or date-time. For all of October, use 2026-10-31T23:59:59Z',
+      },
+      orderBy: {
+        type: 'object',
+        description: "Sort order. STATE_CHANGED_AT with state closed lists recently closed tickets first; each ticket's stateUpdatedAt is its latest state change",
+        properties: {
+          field: {
+            type: 'string',
+            enum: ['CREATED_AT', 'UPDATED_AT', 'STATE_CHANGED_AT', 'LAST_UNANSWERED_USER_MESSAGE_AT'],
+          },
+          direction: {
+            type: 'string',
+            enum: ['ASC', 'DESC'],
+            default: 'DESC',
+          },
+        },
+        required: ['field'],
       },
       limit: {
         type: 'number',

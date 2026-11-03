@@ -159,11 +159,13 @@ export const queries = {
       $first: Int
       $after: String
       $filter: ConversationFilter
+      $orderBy: ConversationOrder
     ) {
       conversations(
         first: $first
         after: $after
         filter: $filter
+        orderBy: $orderBy
       ) {
         nodes {
           ${CONVERSATION_FIELDS}
