@@ -26,7 +26,7 @@ Both repos use Groove's REST API for conversations. This one runs on GraphQL onl
 
 **Messages**
 
-- `listMessages`: every message and note on a ticket, oldest first
+- `listMessages`: every message and note on a ticket, oldest first. Ask for only the first or last few, and for plain text without the HTML
 - `sendMessage`: send an email reply
 - `undoSend`: cancel a mail right after sending it
 - `createNote`: leave an internal note

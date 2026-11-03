@@ -3066,8 +3066,24 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
             "description": "Ticket number (e.g. 12345) or conversation ID",
             "type": "string",
           },
+          "format": {
+            "description": "plain leaves out the HTML body and keeps bodyPlainText, which makes the result about half the size (default: full)",
+            "enum": [
+              "full",
+              "plain",
+            ],
+            "type": "string",
+          },
+          "from": {
+            "description": "Which end limit counts from: end (default) gives the latest messages, start gives the first ones, such as the original question",
+            "enum": [
+              "start",
+              "end",
+            ],
+            "type": "string",
+          },
           "limit": {
-            "description": "Return only this many of the most recent messages (default: all)",
+            "description": "Return only this many messages (default: all), counted from the end unless from is start",
             "type": "number",
           },
         },

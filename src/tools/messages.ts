@@ -9,6 +9,8 @@ import { defineTool, ADDITIVE_TOOL, DESTRUCTIVE_TOOL, READ_TOOL } from './defini
 interface ListMessagesArgs {
   conversationId: string;
   limit?: number;
+  from?: 'start' | 'end';
+  format?: 'full' | 'plain';
 }
 
 interface SendMessageArgs {
@@ -31,7 +33,9 @@ interface CreateNoteArgs {
 export class MessageTools {
   constructor(private client: GrooveClient) {}
 
-  async listMessages(args: ListMessagesArgs): Promise<Message[]> {
+  async listMessages(args: ListMessagesArgs): Promise<Array<Message | Omit<Message, 'body'>>> {
+    if (args.from !== undefined && !['start', 'end'].includes(args.from)) throw new Error('from must be start or end');
+    if (args.format !== undefined && !['full', 'plain'].includes(args.format)) throw new Error('format must be full or plain');
     const conversationId = await this.client.resolveConversationId(args.conversationId);
     const messages: Message[] = [];
     let after: string | undefined;
@@ -65,7 +69,14 @@ export class MessageTools {
 
     messages.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
 
-    return args.limit ? messages.slice(-args.limit) : messages;
+    const picked = !args.limit ? messages : args.from === 'start' ? messages.slice(0, args.limit) : messages.slice(-args.limit);
+    // The HTML body is often twice the size of the plain text
+    if (args.format !== 'plain') return picked;
+    return picked.map(message => {
+      const plain: Partial<Message> = { ...message };
+      delete plain.body;
+      return plain as Omit<Message, 'body'>;
+    });
   }
 
   async sendMessage(args: SendMessageArgs) {
@@ -250,7 +261,17 @@ export const listMessages = defineTool<ListMessagesArgs>({
       },
       limit: {
         type: 'number',
-        description: 'Return only this many of the most recent messages (default: all)',
+        description: 'Return only this many messages (default: all), counted from the end unless from is start',
+      },
+      from: {
+        type: 'string',
+        enum: ['start', 'end'],
+        description: 'Which end limit counts from: end (default) gives the latest messages, start gives the first ones, such as the original question',
+      },
+      format: {
+        type: 'string',
+        enum: ['full', 'plain'],
+        description: 'plain leaves out the HTML body and keeps bodyPlainText, which makes the result about half the size (default: full)',
       },
     },
     required: ['conversationId'],

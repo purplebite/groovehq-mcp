@@ -517,3 +517,39 @@ describe('listConversations counts', () => {
     expect(result.json.conversations).toHaveLength(1);
   });
 });
+
+describe('listMessages from the start and in plain text', () => {
+  const message = n => ({ id: `msg_${n}`, createdAt: `2020-01-0${n}T00:00:00Z`, body: `<p>Text ${n}</p>`, bodyPlainText: `Text ${n}` });
+  const three = (query, variables) =>
+    query.includes('ListEvents') && variables.filter.eventType?.includes('MESSAGE_CREATED')
+      ? { data: { events: { nodes: [3, 1, 2].map(n => ({ change: message(n) })), pageInfo: page } } }
+      : undefined;
+  const ids = result => result.json.map(m => m.id);
+
+  test('limit counts from the end by default', async () => {
+    expect(ids(await call('listMessages', { conversationId: '1', limit: 2 }, ALL_ON, three))).toEqual(['msg_2', 'msg_3']);
+  });
+
+  test('from start gives the first messages', async () => {
+    expect(ids(await call('listMessages', { conversationId: '1', limit: 2, from: 'start' }, ALL_ON, three))).toEqual(['msg_1', 'msg_2']);
+  });
+
+  test('plain leaves out the HTML body', async () => {
+    const result = await call('listMessages', { conversationId: '1', format: 'plain' }, ALL_ON, three);
+    expect(result.json[0]).toEqual({ id: 'msg_1', createdAt: '2020-01-01T00:00:00Z', bodyPlainText: 'Text 1' });
+  });
+
+  test('full keeps both', async () => {
+    const result = await call('listMessages', { conversationId: '1' }, ALL_ON, three);
+    expect(result.json[0]).toMatchObject({ body: '<p>Text 1</p>', bodyPlainText: 'Text 1' });
+  });
+
+  test.each([['from', 'middle', 'from must be start or end'], ['format', 'html', 'format must be full or plain']])(
+    'an unknown %s is refused',
+    async (key, value, error) => {
+      const result = await call('listMessages', { conversationId: '1', [key]: value }, ALL_ON, three);
+      expect(result.isError).toBe(true);
+      expect(result.json.error).toBe(error);
+    },
+  );
+});
