@@ -2682,16 +2682,23 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
         "destructiveHint": false,
         "readOnlyHint": false,
       },
-      "description": "Create an internal note in a conversation",
+      "description": "Create an internal note in a conversation. Returns the ticket and the note as Groove stored it. To tag colleagues so they get a notification, pass mentionAgentIds",
       "inputSchema": {
         "properties": {
           "body": {
-            "description": "The note content",
+            "description": "The note as HTML. Line breaks need <p> or <br>, because plain newlines are dropped. A tag written by hand is <span class="mention">@username</span>, with the username from listAgents; plain @name text is not a tag",
             "type": "string",
           },
           "conversationId": {
             "description": "Ticket number (e.g. 12345) or conversation ID",
             "type": "string",
+          },
+          "mentionAgentIds": {
+            "description": "Agent IDs to tag at the start of the note. Each one is checked first; an unknown or inactive agent stops the note",
+            "items": {
+              "type": "string",
+            },
+            "type": "array",
           },
         },
         "required": [
@@ -2707,7 +2714,7 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
         "destructiveHint": false,
         "readOnlyHint": false,
       },
-      "description": "Create an internal note in a conversation",
+      "description": "Create an internal note in a conversation. Returns the ticket and the note as Groove stored it. To tag colleagues so they get a notification, pass mentionAgentIds",
       "inputSchema": {
         "properties": {
           "authorId": {
@@ -2715,12 +2722,19 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
             "type": "string",
           },
           "body": {
-            "description": "The note content",
+            "description": "The note as HTML. Line breaks need <p> or <br>, because plain newlines are dropped. A tag written by hand is <span class="mention">@username</span>, with the username from listAgents; plain @name text is not a tag",
             "type": "string",
           },
           "conversationId": {
             "description": "Ticket number (e.g. 12345) or conversation ID",
             "type": "string",
+          },
+          "mentionAgentIds": {
+            "description": "Agent IDs to tag at the start of the note. Each one is checked first; an unknown or inactive agent stops the note",
+            "items": {
+              "type": "string",
+            },
+            "type": "array",
           },
         },
         "required": [
@@ -2736,7 +2750,7 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
         "destructiveHint": false,
         "readOnlyHint": false,
       },
-      "description": "Create an internal note in a conversation",
+      "description": "Create an internal note in a conversation. Returns the ticket and the note as Groove stored it. To tag colleagues so they get a notification, pass mentionAgentIds",
       "inputSchema": {
         "properties": {
           "attachments": {
@@ -2768,12 +2782,19 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
             "type": "array",
           },
           "body": {
-            "description": "The note content",
+            "description": "The note as HTML. Line breaks need <p> or <br>, because plain newlines are dropped. A tag written by hand is <span class="mention">@username</span>, with the username from listAgents; plain @name text is not a tag",
             "type": "string",
           },
           "conversationId": {
             "description": "Ticket number (e.g. 12345) or conversation ID",
             "type": "string",
+          },
+          "mentionAgentIds": {
+            "description": "Agent IDs to tag at the start of the note. Each one is checked first; an unknown or inactive agent stops the note",
+            "items": {
+              "type": "string",
+            },
+            "type": "array",
           },
         },
         "required": [
@@ -2789,7 +2810,7 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
         "destructiveHint": false,
         "readOnlyHint": false,
       },
-      "description": "Create an internal note in a conversation",
+      "description": "Create an internal note in a conversation. Returns the ticket and the note as Groove stored it. To tag colleagues so they get a notification, pass mentionAgentIds",
       "inputSchema": {
         "properties": {
           "attachments": {
@@ -2825,12 +2846,19 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
             "type": "string",
           },
           "body": {
-            "description": "The note content",
+            "description": "The note as HTML. Line breaks need <p> or <br>, because plain newlines are dropped. A tag written by hand is <span class="mention">@username</span>, with the username from listAgents; plain @name text is not a tag",
             "type": "string",
           },
           "conversationId": {
             "description": "Ticket number (e.g. 12345) or conversation ID",
             "type": "string",
+          },
+          "mentionAgentIds": {
+            "description": "Agent IDs to tag at the start of the note. Each one is checked first; an unknown or inactive agent stops the note",
+            "items": {
+              "type": "string",
+            },
+            "type": "array",
           },
         },
         "required": [

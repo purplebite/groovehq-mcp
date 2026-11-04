@@ -33,7 +33,7 @@ Both repos use Groove's REST API for conversations. This one runs on GraphQL onl
 - `sendMessage`: send an email reply
 - `undoSend`: cancel a mail right after sending it
 - `moveMessageToNewTicket`: take one message out of a ticket and make it a new ticket
-- `createNote`: leave an internal note
+- `createNote`: leave an internal note, and tag colleagues with `mentionAgentIds` so they get a notification
 - `editNote`, `reactToNote`, `deleteNote`: change, react to, or remove an internal note
 - Attach files to mail, notes, and logged tickets with `attachments`, from a public `https` link or as base64. Off by default
 - `createReplyDraft`: save a reply or note as a draft for someone to review. It never sends

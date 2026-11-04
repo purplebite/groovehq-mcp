@@ -28,9 +28,13 @@ interface SendMessageArgs {
 interface CreateNoteArgs {
   conversationId: string;
   body: string;
+  mentionAgentIds?: string[];
   attachments?: AttachmentArg[];
   authorId?: string;
 }
+
+// The only form Groove turns into a tag. It silently drops the span when the username doesn't exist
+const mentionTag = (username: string) => `<span class="mention">@${username}</span>`;
 
 export class MessageTools {
   constructor(private client: GrooveClient) {}
@@ -171,21 +175,38 @@ export class MessageTools {
     return { deleted: true, messageId };
   }
 
-  async createNote(args: CreateNoteArgs): Promise<Conversation> {
+  async createNote(args: CreateNoteArgs) {
     if (args.authorId != null) await new AgentTools(this.client).checkAuthor(args.authorId);
+    const usernames = args.mentionAgentIds?.length ? await this.mentionNames(args.mentionAgentIds) : [];
+    const body = usernames.length ? `${usernames.map(mentionTag).join(' ')} ${args.body}` : args.body;
 
-    const payload = await this.client.mutate<{ conversation: Conversation }>(
+    const payload = await this.client.mutate<{ conversation: Conversation; message: { id: string; body: string } | null }>(
       mutations.conversationAddNote,
       'conversationAddNote',
       {
         conversationId: await this.client.resolveConversationId(args.conversationId),
-        body: args.body,
+        body,
         attachments: await uploadAttachments(this.client, args.attachments),
         authorId: args.authorId,
       }
     );
 
-    return payload.conversation;
+    // The stored body shows whether Groove kept each tag
+    const note = payload.message ?? undefined;
+    const dropped = note ? usernames.filter(username => !note.body.includes(mentionTag(username))) : [];
+    return { ...payload.conversation, note, ...(dropped.length ? { mentionsDropped: dropped } : {}) };
+  }
+
+  // Looked up before the note is placed, so a wrong ID never leaves a note without its tag
+  private async mentionNames(ids: string[]): Promise<string[]> {
+    const agents = await new AgentTools(this.client).listAgents();
+    return ids.map(id => {
+      const agent = agents.find(candidate => candidate.id === id);
+      if (!agent) throw new Error(`Unknown agent: ${id}`);
+      if (agent.state !== 'ACTIVE') throw new Error(`Agent ${id} is not active, so they can't be tagged`);
+      if (!agent.username || !/^[\w.-]+$/.test(agent.username)) throw new Error(`Agent ${id} has no username to tag`);
+      return agent.username;
+    });
   }
 }
 
@@ -385,7 +406,8 @@ export const createNote = defineTool<CreateNoteArgs>({
   name: 'createNote',
   setting: 'write',
   annotations: ADDITIVE_TOOL,
-  description: 'Create an internal note in a conversation',
+  description:
+    'Create an internal note in a conversation. Returns the ticket and the note as Groove stored it. To tag colleagues so they get a notification, pass mentionAgentIds',
   inputSchema: ({ authorField, attachmentsField }) => ({
     type: 'object',
     properties: {
@@ -395,7 +417,13 @@ export const createNote = defineTool<CreateNoteArgs>({
       },
       body: {
         type: 'string',
-        description: 'The note content',
+        description:
+          'The note as HTML. Line breaks need <p> or <br>, because plain newlines are dropped. A tag written by hand is <span class="mention">@username</span>, with the username from listAgents; plain @name text is not a tag',
+      },
+      mentionAgentIds: {
+        type: 'array',
+        items: { type: 'string' },
+        description: 'Agent IDs to tag at the start of the note. Each one is checked first; an unknown or inactive agent stops the note',
       },
       ...attachmentsField,
       ...authorField,

@@ -742,3 +742,48 @@ describe('several tickets at once', () => {
     },
   );
 });
+
+describe('tagging colleagues in a note', () => {
+  const agents = [
+    { ...agent, id: 'ag_1', username: 'agentone', state: 'ACTIVE' },
+    { ...agent, id: 'ag_2', username: 'agenttwo', state: 'ARCHIVED' },
+  ];
+  const answer = storedBody => (query, variables) => {
+    if (query.includes('ListAgents')) return { data: { agents: { nodes: agents, pageInfo: page } } };
+    if (query.includes('ConversationAddNote')) {
+      return { data: { conversationAddNote: { conversation: ticket, message: { id: 'msg_9', body: storedBody ?? variables.input.body }, errors: [] } } };
+    }
+    return undefined;
+  };
+  const sentBody = () => requests.find(r => r.operation === 'ConversationAddNote').variables.input.body;
+
+  test('mentionAgentIds puts a real tag in front of the body and returns the note', async () => {
+    const result = await call('createNote', { conversationId: '1', body: '<p>Please check</p>', mentionAgentIds: ['ag_1'] }, ALL_ON, answer());
+    expect(sentBody()).toBe('<span class="mention">@agentone</span> <p>Please check</p>');
+    expect(result.json.id).toBe('cnv_1');
+    expect(result.json.note).toEqual({ id: 'msg_9', body: sentBody() });
+    expect(result.json.mentionsDropped).toBeUndefined();
+  });
+
+  test('a tag Groove dropped is reported', async () => {
+    const result = await call('createNote', { conversationId: '1', body: 'Hi', mentionAgentIds: ['ag_1'] }, ALL_ON, answer('@agentone Hi'));
+    expect(result.json.mentionsDropped).toEqual(['agentone']);
+  });
+
+  test.each([
+    ['ag_9', 'Unknown agent: ag_9'],
+    ['ag_2', "Agent ag_2 is not active, so they can't be tagged"],
+  ])('%s stops the note before it is placed', async (id, error) => {
+    const result = await call('createNote', { conversationId: '1', body: 'Hi', mentionAgentIds: [id] }, ALL_ON, answer());
+    expect(result.isError).toBe(true);
+    expect(result.json.error).toBe(error);
+    expect(result.operations).not.toContain('ConversationAddNote');
+  });
+
+  test('without mentionAgentIds the body goes as is and agents are not looked up', async () => {
+    const result = await call('createNote', { conversationId: '1', body: 'Line one<br>Line two' }, ALL_ON, answer());
+    expect(sentBody()).toBe('Line one<br>Line two');
+    expect(result.operations).not.toContain('ListAgents');
+    expect(result.json.note.id).toBe('msg_9');
+  });
+});
