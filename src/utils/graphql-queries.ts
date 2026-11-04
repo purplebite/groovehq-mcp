@@ -529,6 +529,20 @@ export const queries = {
     }
   `,
 
+  listLinkedResources: `
+    query ListLinkedResources($filter: LinkedResourcesFilterInput!) {
+      linkedResources(filter: $filter, first: 50) {
+        nodes {
+          provider
+          externalId
+          title
+          url
+          createdAt
+        }
+      }
+    }
+  `,
+
   listTeams: `
     query ListTeams($first: Int, $after: String) {
       teams(first: $first, after: $after) {
@@ -711,6 +725,21 @@ export const mutations = {
       conversationUnread(input: $input) {
         conversation {
           ${CONVERSATION_FIELDS}
+        }
+        errors {
+          message
+          path
+        }
+      }
+    }
+  `,
+
+  conversationLinkResource: `
+    mutation ConversationLinkResource($input: conversationLinkResourceInput!) {
+      conversationLinkResource(input: $input) {
+        conversation {
+          id
+          number
         }
         errors {
           message

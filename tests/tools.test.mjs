@@ -64,6 +64,7 @@ function respond(query, variables = {}) {
       ? { nodes: [{ change: { id: 'msg_1', createdAt: '2020-01-01T00:00:00Z', body: 'Hi' } }], pageInfo: page }
       : { nodes: [], pageInfo: page },
     customFields: { nodes: [], pageInfo: page },
+    linkedResources: { nodes: [{ provider: 'JIRA_CLOUD', externalId: 'IT-1', title: 'Issue', url: 'https://example.atlassian.net/browse/IT-1' }] },
     customProfile: '<h3>Otys</h3><style>.x { color: red }</style><ul><li>Status: <b>Active</b></li><li>Recruiter &amp; owner: Kees</li></ul>',
     rawEmail: { headers: [{ name: 'From', value: 'a@example.com' }], bodyPlainText: 'Hello' },
     rules: {
@@ -116,6 +117,8 @@ async function call(name, args, options = ALL_ON, custom = () => undefined) {
 const normalPaths = [
   ['listConversations', {}, 'ListConversations', r => expect(r.conversations[0].id).toBe('cnv_1')],
   ['getConversation', { id: '1' }, 'GetConversation', r => expect(r.id).toBe('cnv_1')],
+  ['listLinkedResources', { conversationId: '1' }, 'ListLinkedResources', r => expect(r[0].externalId).toBe('IT-1')],
+  ['linkResource', { conversationId: '1', provider: 'JIRA_CLOUD', externalId: 'IT-1', title: 'Issue', url: 'https://example.atlassian.net/browse/IT-1' }, 'ConversationLinkResource', r => expect(r.linked.externalId).toBe('IT-1')],
   ['createConversation', { channelId: 'ch_1', to: 'a@example.com', subject: 's', body: 'b' }, 'ConversationCreateEmail', r => expect(r.id).toBe('cnv_1')],
   ['logConversation', { channelId: 'ch_1', to: 'a@example.com', subject: 's', body: 'b' }, 'ConversationLog', r => expect(r).toMatchObject({ logged: true, sent: false })],
   ['updateConversation', { id: '1', subject: 'New' }, 'ConversationSubject', r => expect(r.id).toBe('cnv_1')],
@@ -679,5 +682,34 @@ describe('contact profile', () => {
   test('refresh and mailbox go to Groove', async () => {
     await call('getContactProfile', { contactId: 'co_1', channelId: 'ch_1', refresh: true });
     expect(requests.find(r => r.operation === 'GetCustomProfile').variables).toEqual({ contactId: 'co_1', channelId: 'ch_1', hardRefresh: true });
+  });
+});
+
+describe('links to other systems', () => {
+  const link = { conversationId: '1', provider: 'JIRA_CLOUD', externalId: 'IT-1', title: 'Issue', url: 'https://example.atlassian.net/browse/IT-1' };
+  const sent = () => requests.find(r => r.operation === 'ConversationLinkResource').variables.input;
+
+  test('a link goes to Groove with removed false', async () => {
+    await call('linkResource', link);
+    expect(sent()).toEqual({ conversationId: 'cnv_1', provider: 'JIRA_CLOUD', externalId: 'IT-1', title: 'Issue', url: link.url, removed: false });
+  });
+
+  test('remove takes the link away', async () => {
+    const result = await call('linkResource', { ...link, remove: true });
+    expect(sent().removed).toBe(true);
+    expect(result.json.unlinked.externalId).toBe('IT-1');
+  });
+
+  test('a link that is not a web address is refused before Groove is asked', async () => {
+    const result = await call('linkResource', { ...link, url: 'javascript:alert(1)' });
+    expect(result.isError).toBe(true);
+    expect(result.json.error).toBe('url must start with https:// or http://');
+    expect(result.operations).not.toContain('ConversationLinkResource');
+  });
+
+  test('is a write tool, so it is left out when read-only', async () => {
+    const result = await call('linkResource', link, { readOnly: true });
+    expect(result.isError).toBe(true);
+    expect(result.json.error).toContain('linkResource is disabled');
   });
 });

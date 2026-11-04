@@ -14,6 +14,7 @@ Both repos use Groove's REST API for conversations. This one runs on GraphQL onl
 
 - `listConversations`: search and filter by keyword, state, agent, team, contact or their email address, channel, tag, Smart Folder, @mention, draft, rating, star, trash, how the ticket came in, or creation and update date, and sort by date. It also gives the total number of matching tickets, so a count takes one call
 - `getConversation`: get one ticket
+- `listLinkedResources`, `linkResource`: see and add links from a ticket to items in other systems, such as Jira issues
 - `createConversation`: start a new ticket by sending an email, in a chosen `state`
 - `logConversation`: Groove's Log a Conversation. Start a ticket with an internal note, for example after a phone call. It never sends mail
 - `updateConversation`: change the state, subject, contact, or mailbox, mark a ticket unread, star or follow it, assign or unassign someone, or add or remove tags

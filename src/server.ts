@@ -50,9 +50,11 @@ const BOOLEAN_OPTIONS = ['readOnly', 'allowSend', 'allowSendAs', 'allowMerge', '
 const TOOLS: Tool[] = [
   conversations.listConversations,
   conversations.getConversation,
+  conversations.listLinkedResources,
   conversations.createConversation,
   conversations.logConversation,
   conversations.updateConversation,
+  conversations.linkResource,
   conversations.deleteConversation,
   conversations.deleteConversationPermanently,
   conversations.restoreConversation,

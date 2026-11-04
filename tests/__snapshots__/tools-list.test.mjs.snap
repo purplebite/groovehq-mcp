@@ -6,8 +6,10 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
     "(all off)": [
       "listConversations",
       "getConversation",
+      "listLinkedResources",
       "logConversation",
       "updateConversation",
+      "linkResource",
       "deleteConversation",
       "restoreConversation",
       "markAsSpam",
@@ -45,8 +47,10 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
     "allowAttachments": [
       "listConversations",
       "getConversation",
+      "listLinkedResources",
       "logConversation (3)",
       "updateConversation",
+      "linkResource",
       "deleteConversation",
       "restoreConversation",
       "markAsSpam",
@@ -84,8 +88,10 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
     "allowMerge": [
       "listConversations",
       "getConversation",
+      "listLinkedResources",
       "logConversation",
       "updateConversation",
+      "linkResource",
       "deleteConversation",
       "restoreConversation",
       "markAsSpam",
@@ -125,8 +131,10 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
     "allowMerge + allowAttachments": [
       "listConversations",
       "getConversation",
+      "listLinkedResources",
       "logConversation (3)",
       "updateConversation",
+      "linkResource",
       "deleteConversation",
       "restoreConversation",
       "markAsSpam",
@@ -166,8 +174,10 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
     "allowMerge + allowPermanentDelete": [
       "listConversations",
       "getConversation",
+      "listLinkedResources",
       "logConversation",
       "updateConversation",
+      "linkResource",
       "deleteConversation",
       "deleteConversationPermanently",
       "restoreConversation",
@@ -208,8 +218,10 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
     "allowMerge + allowPermanentDelete + allowAttachments": [
       "listConversations",
       "getConversation",
+      "listLinkedResources",
       "logConversation (3)",
       "updateConversation",
+      "linkResource",
       "deleteConversation",
       "deleteConversationPermanently",
       "restoreConversation",
@@ -250,8 +262,10 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
     "allowPermanentDelete": [
       "listConversations",
       "getConversation",
+      "listLinkedResources",
       "logConversation",
       "updateConversation",
+      "linkResource",
       "deleteConversation",
       "deleteConversationPermanently",
       "restoreConversation",
@@ -290,8 +304,10 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
     "allowPermanentDelete + allowAttachments": [
       "listConversations",
       "getConversation",
+      "listLinkedResources",
       "logConversation (3)",
       "updateConversation",
+      "linkResource",
       "deleteConversation",
       "deleteConversationPermanently",
       "restoreConversation",
@@ -330,9 +346,11 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
     "allowSend": [
       "listConversations",
       "getConversation",
+      "listLinkedResources",
       "createConversation",
       "logConversation",
       "updateConversation",
+      "linkResource",
       "deleteConversation",
       "restoreConversation",
       "markAsSpam",
@@ -373,9 +391,11 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
     "allowSend + allowAttachments": [
       "listConversations",
       "getConversation",
+      "listLinkedResources",
       "createConversation (3)",
       "logConversation (3)",
       "updateConversation",
+      "linkResource",
       "deleteConversation",
       "restoreConversation",
       "markAsSpam",
@@ -416,9 +436,11 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
     "allowSend + allowMerge": [
       "listConversations",
       "getConversation",
+      "listLinkedResources",
       "createConversation",
       "logConversation",
       "updateConversation",
+      "linkResource",
       "deleteConversation",
       "restoreConversation",
       "markAsSpam",
@@ -461,9 +483,11 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
     "allowSend + allowMerge + allowAttachments": [
       "listConversations",
       "getConversation",
+      "listLinkedResources",
       "createConversation (3)",
       "logConversation (3)",
       "updateConversation",
+      "linkResource",
       "deleteConversation",
       "restoreConversation",
       "markAsSpam",
@@ -506,9 +530,11 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
     "allowSend + allowMerge + allowPermanentDelete": [
       "listConversations",
       "getConversation",
+      "listLinkedResources",
       "createConversation",
       "logConversation",
       "updateConversation",
+      "linkResource",
       "deleteConversation",
       "deleteConversationPermanently",
       "restoreConversation",
@@ -552,9 +578,11 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
     "allowSend + allowMerge + allowPermanentDelete + allowAttachments": [
       "listConversations",
       "getConversation",
+      "listLinkedResources",
       "createConversation (3)",
       "logConversation (3)",
       "updateConversation",
+      "linkResource",
       "deleteConversation",
       "deleteConversationPermanently",
       "restoreConversation",
@@ -598,9 +626,11 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
     "allowSend + allowPermanentDelete": [
       "listConversations",
       "getConversation",
+      "listLinkedResources",
       "createConversation",
       "logConversation",
       "updateConversation",
+      "linkResource",
       "deleteConversation",
       "deleteConversationPermanently",
       "restoreConversation",
@@ -642,9 +672,11 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
     "allowSend + allowPermanentDelete + allowAttachments": [
       "listConversations",
       "getConversation",
+      "listLinkedResources",
       "createConversation (3)",
       "logConversation (3)",
       "updateConversation",
+      "linkResource",
       "deleteConversation",
       "deleteConversationPermanently",
       "restoreConversation",
@@ -686,9 +718,11 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
     "allowSend + allowSendAs": [
       "listConversations",
       "getConversation",
+      "listLinkedResources",
       "createConversation (2)",
       "logConversation (2)",
       "updateConversation",
+      "linkResource",
       "deleteConversation",
       "restoreConversation",
       "markAsSpam",
@@ -729,9 +763,11 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
     "allowSend + allowSendAs + allowAttachments": [
       "listConversations",
       "getConversation",
+      "listLinkedResources",
       "createConversation (4)",
       "logConversation (4)",
       "updateConversation",
+      "linkResource",
       "deleteConversation",
       "restoreConversation",
       "markAsSpam",
@@ -772,9 +808,11 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
     "allowSend + allowSendAs + allowMerge": [
       "listConversations",
       "getConversation",
+      "listLinkedResources",
       "createConversation (2)",
       "logConversation (2)",
       "updateConversation",
+      "linkResource",
       "deleteConversation",
       "restoreConversation",
       "markAsSpam",
@@ -817,9 +855,11 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
     "allowSend + allowSendAs + allowMerge + allowAttachments": [
       "listConversations",
       "getConversation",
+      "listLinkedResources",
       "createConversation (4)",
       "logConversation (4)",
       "updateConversation",
+      "linkResource",
       "deleteConversation",
       "restoreConversation",
       "markAsSpam",
@@ -862,9 +902,11 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
     "allowSend + allowSendAs + allowMerge + allowPermanentDelete": [
       "listConversations",
       "getConversation",
+      "listLinkedResources",
       "createConversation (2)",
       "logConversation (2)",
       "updateConversation",
+      "linkResource",
       "deleteConversation",
       "deleteConversationPermanently",
       "restoreConversation",
@@ -908,9 +950,11 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
     "allowSend + allowSendAs + allowMerge + allowPermanentDelete + allowAttachments": [
       "listConversations",
       "getConversation",
+      "listLinkedResources",
       "createConversation (4)",
       "logConversation (4)",
       "updateConversation",
+      "linkResource",
       "deleteConversation",
       "deleteConversationPermanently",
       "restoreConversation",
@@ -954,9 +998,11 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
     "allowSend + allowSendAs + allowPermanentDelete": [
       "listConversations",
       "getConversation",
+      "listLinkedResources",
       "createConversation (2)",
       "logConversation (2)",
       "updateConversation",
+      "linkResource",
       "deleteConversation",
       "deleteConversationPermanently",
       "restoreConversation",
@@ -998,9 +1044,11 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
     "allowSend + allowSendAs + allowPermanentDelete + allowAttachments": [
       "listConversations",
       "getConversation",
+      "listLinkedResources",
       "createConversation (4)",
       "logConversation (4)",
       "updateConversation",
+      "linkResource",
       "deleteConversation",
       "deleteConversationPermanently",
       "restoreConversation",
@@ -1042,8 +1090,10 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
     "allowSendAs": [
       "listConversations",
       "getConversation",
+      "listLinkedResources",
       "logConversation (2)",
       "updateConversation",
+      "linkResource",
       "deleteConversation",
       "restoreConversation",
       "markAsSpam",
@@ -1081,8 +1131,10 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
     "allowSendAs + allowAttachments": [
       "listConversations",
       "getConversation",
+      "listLinkedResources",
       "logConversation (4)",
       "updateConversation",
+      "linkResource",
       "deleteConversation",
       "restoreConversation",
       "markAsSpam",
@@ -1120,8 +1172,10 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
     "allowSendAs + allowMerge": [
       "listConversations",
       "getConversation",
+      "listLinkedResources",
       "logConversation (2)",
       "updateConversation",
+      "linkResource",
       "deleteConversation",
       "restoreConversation",
       "markAsSpam",
@@ -1161,8 +1215,10 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
     "allowSendAs + allowMerge + allowAttachments": [
       "listConversations",
       "getConversation",
+      "listLinkedResources",
       "logConversation (4)",
       "updateConversation",
+      "linkResource",
       "deleteConversation",
       "restoreConversation",
       "markAsSpam",
@@ -1202,8 +1258,10 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
     "allowSendAs + allowMerge + allowPermanentDelete": [
       "listConversations",
       "getConversation",
+      "listLinkedResources",
       "logConversation (2)",
       "updateConversation",
+      "linkResource",
       "deleteConversation",
       "deleteConversationPermanently",
       "restoreConversation",
@@ -1244,8 +1302,10 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
     "allowSendAs + allowMerge + allowPermanentDelete + allowAttachments": [
       "listConversations",
       "getConversation",
+      "listLinkedResources",
       "logConversation (4)",
       "updateConversation",
+      "linkResource",
       "deleteConversation",
       "deleteConversationPermanently",
       "restoreConversation",
@@ -1286,8 +1346,10 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
     "allowSendAs + allowPermanentDelete": [
       "listConversations",
       "getConversation",
+      "listLinkedResources",
       "logConversation (2)",
       "updateConversation",
+      "linkResource",
       "deleteConversation",
       "deleteConversationPermanently",
       "restoreConversation",
@@ -1326,8 +1388,10 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
     "allowSendAs + allowPermanentDelete + allowAttachments": [
       "listConversations",
       "getConversation",
+      "listLinkedResources",
       "logConversation (4)",
       "updateConversation",
+      "linkResource",
       "deleteConversation",
       "deleteConversationPermanently",
       "restoreConversation",
@@ -1366,6 +1430,7 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
     "readOnly": [
       "listConversations",
       "getConversation",
+      "listLinkedResources",
       "listMessages",
       "getRawEmail",
       "getAttachment",
@@ -1388,6 +1453,7 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
     "readOnly + allowAttachments": [
       "listConversations",
       "getConversation",
+      "listLinkedResources",
       "listMessages",
       "getRawEmail",
       "getAttachment",
@@ -1410,6 +1476,7 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
     "readOnly + allowMerge": [
       "listConversations",
       "getConversation",
+      "listLinkedResources",
       "listMessages",
       "getRawEmail",
       "getAttachment",
@@ -1432,6 +1499,7 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
     "readOnly + allowMerge + allowAttachments": [
       "listConversations",
       "getConversation",
+      "listLinkedResources",
       "listMessages",
       "getRawEmail",
       "getAttachment",
@@ -1454,6 +1522,7 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
     "readOnly + allowMerge + allowPermanentDelete": [
       "listConversations",
       "getConversation",
+      "listLinkedResources",
       "listMessages",
       "getRawEmail",
       "getAttachment",
@@ -1476,6 +1545,7 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
     "readOnly + allowMerge + allowPermanentDelete + allowAttachments": [
       "listConversations",
       "getConversation",
+      "listLinkedResources",
       "listMessages",
       "getRawEmail",
       "getAttachment",
@@ -1498,6 +1568,7 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
     "readOnly + allowPermanentDelete": [
       "listConversations",
       "getConversation",
+      "listLinkedResources",
       "listMessages",
       "getRawEmail",
       "getAttachment",
@@ -1520,6 +1591,7 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
     "readOnly + allowPermanentDelete + allowAttachments": [
       "listConversations",
       "getConversation",
+      "listLinkedResources",
       "listMessages",
       "getRawEmail",
       "getAttachment",
@@ -1542,6 +1614,7 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
     "readOnly + allowSend": [
       "listConversations",
       "getConversation",
+      "listLinkedResources",
       "listMessages",
       "getRawEmail",
       "getAttachment",
@@ -1564,6 +1637,7 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
     "readOnly + allowSend + allowAttachments": [
       "listConversations",
       "getConversation",
+      "listLinkedResources",
       "listMessages",
       "getRawEmail",
       "getAttachment",
@@ -1586,6 +1660,7 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
     "readOnly + allowSend + allowMerge": [
       "listConversations",
       "getConversation",
+      "listLinkedResources",
       "listMessages",
       "getRawEmail",
       "getAttachment",
@@ -1608,6 +1683,7 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
     "readOnly + allowSend + allowMerge + allowAttachments": [
       "listConversations",
       "getConversation",
+      "listLinkedResources",
       "listMessages",
       "getRawEmail",
       "getAttachment",
@@ -1630,6 +1706,7 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
     "readOnly + allowSend + allowMerge + allowPermanentDelete": [
       "listConversations",
       "getConversation",
+      "listLinkedResources",
       "listMessages",
       "getRawEmail",
       "getAttachment",
@@ -1652,6 +1729,7 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
     "readOnly + allowSend + allowMerge + allowPermanentDelete + allowAttachments": [
       "listConversations",
       "getConversation",
+      "listLinkedResources",
       "listMessages",
       "getRawEmail",
       "getAttachment",
@@ -1674,6 +1752,7 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
     "readOnly + allowSend + allowPermanentDelete": [
       "listConversations",
       "getConversation",
+      "listLinkedResources",
       "listMessages",
       "getRawEmail",
       "getAttachment",
@@ -1696,6 +1775,7 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
     "readOnly + allowSend + allowPermanentDelete + allowAttachments": [
       "listConversations",
       "getConversation",
+      "listLinkedResources",
       "listMessages",
       "getRawEmail",
       "getAttachment",
@@ -1718,6 +1798,7 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
     "readOnly + allowSend + allowSendAs": [
       "listConversations",
       "getConversation",
+      "listLinkedResources",
       "listMessages",
       "getRawEmail",
       "getAttachment",
@@ -1740,6 +1821,7 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
     "readOnly + allowSend + allowSendAs + allowAttachments": [
       "listConversations",
       "getConversation",
+      "listLinkedResources",
       "listMessages",
       "getRawEmail",
       "getAttachment",
@@ -1762,6 +1844,7 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
     "readOnly + allowSend + allowSendAs + allowMerge": [
       "listConversations",
       "getConversation",
+      "listLinkedResources",
       "listMessages",
       "getRawEmail",
       "getAttachment",
@@ -1784,6 +1867,7 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
     "readOnly + allowSend + allowSendAs + allowMerge + allowAttachments": [
       "listConversations",
       "getConversation",
+      "listLinkedResources",
       "listMessages",
       "getRawEmail",
       "getAttachment",
@@ -1806,6 +1890,7 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
     "readOnly + allowSend + allowSendAs + allowMerge + allowPermanentDelete": [
       "listConversations",
       "getConversation",
+      "listLinkedResources",
       "listMessages",
       "getRawEmail",
       "getAttachment",
@@ -1828,6 +1913,7 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
     "readOnly + allowSend + allowSendAs + allowMerge + allowPermanentDelete + allowAttachments": [
       "listConversations",
       "getConversation",
+      "listLinkedResources",
       "listMessages",
       "getRawEmail",
       "getAttachment",
@@ -1850,6 +1936,7 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
     "readOnly + allowSend + allowSendAs + allowPermanentDelete": [
       "listConversations",
       "getConversation",
+      "listLinkedResources",
       "listMessages",
       "getRawEmail",
       "getAttachment",
@@ -1872,6 +1959,7 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
     "readOnly + allowSend + allowSendAs + allowPermanentDelete + allowAttachments": [
       "listConversations",
       "getConversation",
+      "listLinkedResources",
       "listMessages",
       "getRawEmail",
       "getAttachment",
@@ -1894,6 +1982,7 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
     "readOnly + allowSendAs": [
       "listConversations",
       "getConversation",
+      "listLinkedResources",
       "listMessages",
       "getRawEmail",
       "getAttachment",
@@ -1916,6 +2005,7 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
     "readOnly + allowSendAs + allowAttachments": [
       "listConversations",
       "getConversation",
+      "listLinkedResources",
       "listMessages",
       "getRawEmail",
       "getAttachment",
@@ -1938,6 +2028,7 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
     "readOnly + allowSendAs + allowMerge": [
       "listConversations",
       "getConversation",
+      "listLinkedResources",
       "listMessages",
       "getRawEmail",
       "getAttachment",
@@ -1960,6 +2051,7 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
     "readOnly + allowSendAs + allowMerge + allowAttachments": [
       "listConversations",
       "getConversation",
+      "listLinkedResources",
       "listMessages",
       "getRawEmail",
       "getAttachment",
@@ -1982,6 +2074,7 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
     "readOnly + allowSendAs + allowMerge + allowPermanentDelete": [
       "listConversations",
       "getConversation",
+      "listLinkedResources",
       "listMessages",
       "getRawEmail",
       "getAttachment",
@@ -2004,6 +2097,7 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
     "readOnly + allowSendAs + allowMerge + allowPermanentDelete + allowAttachments": [
       "listConversations",
       "getConversation",
+      "listLinkedResources",
       "listMessages",
       "getRawEmail",
       "getAttachment",
@@ -2026,6 +2120,7 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
     "readOnly + allowSendAs + allowPermanentDelete": [
       "listConversations",
       "getConversation",
+      "listLinkedResources",
       "listMessages",
       "getRawEmail",
       "getAttachment",
@@ -2048,6 +2143,7 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
     "readOnly + allowSendAs + allowPermanentDelete + allowAttachments": [
       "listConversations",
       "getConversation",
+      "listLinkedResources",
       "listMessages",
       "getRawEmail",
       "getAttachment",
@@ -3169,6 +3265,68 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
       },
       "name": "getRawEmail",
     },
+    "linkResource": {
+      "annotations": {
+        "destructiveHint": false,
+        "readOnlyHint": false,
+      },
+      "description": "Link a ticket to an item in another system, such as a Jira issue, so it shows in Groove's sidebar. With remove, the link goes again. It only records the link in Groove",
+      "inputSchema": {
+        "properties": {
+          "conversationId": {
+            "description": "Ticket number (e.g. 12345) or conversation ID",
+            "type": "string",
+          },
+          "externalId": {
+            "description": "The item's ID in that system, for example the Jira issue key IT-123",
+            "type": "string",
+          },
+          "provider": {
+            "description": "The system the item lives in, for example JIRA_CLOUD",
+            "enum": [
+              "JIRA_CLOUD",
+              "JIRA_SERVER",
+              "GITHUB",
+              "GITHUB_LEGACY",
+              "LINEAR",
+              "TRELLO",
+              "HUBSPOT",
+              "SALESFORCE",
+              "SHOPIFY",
+              "SHOPIFY_V2",
+              "STRIPE",
+              "RECHARGE",
+              "MICROSOFT_OFFICE_365",
+              "GOOGLE",
+              "OPTIMIZECX",
+              "CHAT",
+            ],
+            "type": "string",
+          },
+          "remove": {
+            "description": "Remove this link instead of adding it",
+            "type": "boolean",
+          },
+          "title": {
+            "description": "Title to show in Groove, for example the issue summary",
+            "type": "string",
+          },
+          "url": {
+            "description": "Link to the item",
+            "type": "string",
+          },
+        },
+        "required": [
+          "conversationId",
+          "provider",
+          "externalId",
+          "title",
+          "url",
+        ],
+        "type": "object",
+      },
+      "name": "linkResource",
+    },
     "listAgents": {
       "annotations": {
         "readOnlyHint": true,
@@ -3554,6 +3712,25 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
         "type": "object",
       },
       "name": "listFolders",
+    },
+    "listLinkedResources": {
+      "annotations": {
+        "readOnlyHint": true,
+      },
+      "description": "List what a ticket is linked to in other systems through Groove, such as Jira issues, with title and link",
+      "inputSchema": {
+        "properties": {
+          "conversationId": {
+            "description": "Ticket number (e.g. 12345) or conversation ID",
+            "type": "string",
+          },
+        },
+        "required": [
+          "conversationId",
+        ],
+        "type": "object",
+      },
+      "name": "listLinkedResources",
     },
     "listMessages": {
       "annotations": {

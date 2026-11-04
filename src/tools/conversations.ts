@@ -8,6 +8,20 @@ import { AttachmentArg, uploadAttachments } from './attachments.js';
 import { pageGuard } from '../utils/paging.js';
 import { defineTool, ADDITIVE_TOOL, DESTRUCTIVE_TOOL, READ_TOOL } from './definition.js';
 
+const PROVIDERS = [
+  'JIRA_CLOUD', 'JIRA_SERVER', 'GITHUB', 'GITHUB_LEGACY', 'LINEAR', 'TRELLO', 'HUBSPOT', 'SALESFORCE',
+  'SHOPIFY', 'SHOPIFY_V2', 'STRIPE', 'RECHARGE', 'MICROSOFT_OFFICE_365', 'GOOGLE', 'OPTIMIZECX', 'CHAT',
+];
+
+interface LinkResourceArgs {
+  conversationId: string;
+  provider: string;
+  externalId: string;
+  title: string;
+  url: string;
+  remove?: boolean;
+}
+
 type ConversationStateArg = 'unread' | 'opened' | 'closed' | 'snoozed' | 'spam';
 
 interface ListConversationsArgs {
@@ -455,6 +469,28 @@ export class ConversationTools {
       conversationIds: [await this.client.resolveConversationId(id)],
       deleteMode,
     });
+  }
+
+  async listLinkedResources(conversationId: string) {
+    const response = await this.client.request<{
+      linkedResources: { nodes: Array<{ provider: string; externalId: string; title: string; url: string; createdAt: string }> };
+    }>(queries.listLinkedResources, { filter: { conversationId: await this.client.resolveConversationId(conversationId) } });
+    return response.linkedResources.nodes;
+  }
+
+  // Groove keeps the link with the ticket and shows it in its sidebar
+  async linkResource(args: LinkResourceArgs) {
+    // The link is shown to agents in Groove, so it must be a web address
+    if (!/^https?:\/\//i.test(args.url)) throw new Error('url must start with https:// or http://');
+    await this.client.mutate(mutations.conversationLinkResource, 'conversationLinkResource', {
+      conversationId: await this.client.resolveConversationId(args.conversationId),
+      provider: args.provider,
+      externalId: args.externalId,
+      title: args.title,
+      url: args.url,
+      removed: args.remove === true,
+    });
+    return { ticket: args.conversationId, [args.remove ? 'unlinked' : 'linked']: { provider: args.provider, externalId: args.externalId } };
   }
 
   // Spam reaches past this ticket, so it only goes through markAsSpam
@@ -1020,6 +1056,64 @@ export const restoreConversation = defineTool<{ id: string }>({
     required: ['id'],
   },
   handler: (args, { conversations }) => conversations.restoreConversation(args.id),
+});
+
+export const listLinkedResources = defineTool<{ conversationId: string }>({
+  name: 'listLinkedResources',
+  setting: 'read',
+  annotations: READ_TOOL,
+  description: 'List what a ticket is linked to in other systems through Groove, such as Jira issues, with title and link',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      conversationId: {
+        type: 'string',
+        description: 'Ticket number (e.g. 12345) or conversation ID',
+      },
+    },
+    required: ['conversationId'],
+  },
+  handler: (args, { conversations }) => conversations.listLinkedResources(args.conversationId),
+});
+
+export const linkResource = defineTool<LinkResourceArgs>({
+  name: 'linkResource',
+  setting: 'write',
+  annotations: ADDITIVE_TOOL,
+  description:
+    "Link a ticket to an item in another system, such as a Jira issue, so it shows in Groove's sidebar. With remove, the link goes again. It only records the link in Groove",
+  inputSchema: {
+    type: 'object',
+    properties: {
+      conversationId: {
+        type: 'string',
+        description: 'Ticket number (e.g. 12345) or conversation ID',
+      },
+      provider: {
+        type: 'string',
+        enum: PROVIDERS,
+        description: 'The system the item lives in, for example JIRA_CLOUD',
+      },
+      externalId: {
+        type: 'string',
+        description: "The item's ID in that system, for example the Jira issue key IT-123",
+      },
+      title: {
+        type: 'string',
+        description: 'Title to show in Groove, for example the issue summary',
+      },
+      url: {
+        type: 'string',
+        description: 'Link to the item',
+      },
+      remove: {
+        type: 'boolean',
+        description: 'Remove this link instead of adding it',
+      },
+    },
+    required: ['conversationId', 'provider', 'externalId', 'title', 'url'],
+  },
+  handler: (args, { conversations }) => conversations.linkResource(args),
 });
 
 export const markAsSpam = defineTool<{ id: string }>({
