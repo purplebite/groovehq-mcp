@@ -490,14 +490,15 @@ describe('team membership', () => {
     expect(result.json.error).toContain('more than 100 members');
   });
 
-  test.each([['listAgents', {}], ['getAgent', { id: 'ag_1' }]])('%s lists the teams of an agent', async (tool, args) => {
+  test.each([['listAgents', {}], ['getAgent', { id: 'ag_1' }]])('%s lists the teams and username of an agent', async (tool, args) => {
     const answer = query =>
       query.includes('ListAgents')
-        ? { data: { agents: { nodes: [{ ...agent, teams: { nodes: [{ id: 'tm_1', name: 'Team' }] } }], pageInfo: page } } }
+        ? { data: { agents: { nodes: [{ ...agent, username: 'agentone', teams: { nodes: [{ id: 'tm_1', name: 'Team' }] } }], pageInfo: page } } }
         : undefined;
     const result = await call(tool, args, ALL_ON, answer);
     const found = Array.isArray(result.json) ? result.json[0] : result.json;
     expect(found.teams).toEqual([{ id: 'tm_1', name: 'Team' }]);
+    expect(found.username).toBe('agentone');
   });
 });
 

@@ -409,6 +409,7 @@ export const queries = {
       agents(first: $first, after: $after) {
         nodes {
           ${AGENT_FIELDS}
+          username
           teams(first: 100) {
             nodes {
               id

@@ -53,7 +53,7 @@ export const listAgents = defineTool({
   name: 'listAgents',
   setting: 'read',
   annotations: READ_TOOL,
-  description: 'List all agents in the organization, with the teams each one is in',
+  description: 'List all agents in the organization, with the teams each one is in and the username used to tag them in a note',
   inputSchema: {
     type: 'object',
     properties: {},
@@ -65,7 +65,7 @@ export const getAgent = defineTool<{ id: string }>({
   name: 'getAgent',
   setting: 'read',
   annotations: READ_TOOL,
-  description: 'Get detailed information about a specific agent, including the teams they are in',
+  description: 'Get detailed information about a specific agent, including the teams they are in and the username used to tag them in a note',
   inputSchema: {
     type: 'object',
     properties: {

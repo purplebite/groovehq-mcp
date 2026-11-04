@@ -92,6 +92,7 @@ export interface Agent {
   avatarUrl?: string;
   role: 'admin' | 'agent';
   state: string;
+  username?: string | null;
   teams?: Array<{ id: string; name: string }>;
 }
 

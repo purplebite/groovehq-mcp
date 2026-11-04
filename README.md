@@ -47,7 +47,7 @@ Both repos use Groove's REST API for conversations. This one runs on GraphQL onl
 - `mergeContacts`: merge a typo or duplicate contact into the right one. This can't be undone
 - `deleteContact`, `deleteContacts`: delete contacts without tickets, which also removes them from recipient suggestions. This can't be undone
 - `listCompanies`, `updateCompany`: find companies, and change a company's name or extra domains
-- `listAgents`, `getAgent`: agents and the teams they're in
+- `listAgents`, `getAgent`: agents, the teams they're in, and the username to tag them with
 - `listChannels`, `getChannel`
 - `listFolders`: see the Smart Folders you can use in `listConversations`
 - `listRules`: read Groove's automatic rules, to see why a ticket got a tag, an assignee, or a status
