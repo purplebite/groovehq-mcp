@@ -21,7 +21,7 @@ Both repos use Groove's REST API for conversations. This one runs on GraphQL onl
 - `closeConversation`: the most satisfying one
 - `mergeConversations`: merge one ticket into another. This can't be undone
 - `forwardConversation`: forward a ticket by email. The ticket stays as it was
-- `deleteConversation`, `restoreConversation`: delete a ticket and bring it back. `deleteConversations` deletes up to 100 at once
+- `deleteConversation`, `restoreConversation`: delete a ticket and bring it back
 - `deleteConversationPermanently`: delete a ticket for good
 - `markAsSpam`: mark a ticket as spam
 

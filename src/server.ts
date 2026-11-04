@@ -56,7 +56,6 @@ const TOOLS: Tool[] = [
   conversations.updateConversation,
   conversations.linkResource,
   conversations.deleteConversation,
-  conversations.deleteConversations,
   conversations.deleteConversationPermanently,
   conversations.restoreConversation,
   conversations.markAsSpam,
