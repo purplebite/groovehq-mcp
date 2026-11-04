@@ -9,6 +9,7 @@ import type { FolderTools } from './folders.js';
 import type { DraftTools } from './drafts.js';
 import type { KnowledgeBaseResources } from '../resources/kb-articles.js';
 import type { AttachmentReader } from './attachment-reader/index.js';
+import type { CannedReplyTools } from './canned-replies.js';
 
 // claude.ai groups tools and sets approval by these. destructiveHint defaults to true, so always set it
 export const READ_TOOL = { readOnlyHint: true };
@@ -73,6 +74,7 @@ export interface ToolContext {
   drafts: DraftTools;
   kb: KnowledgeBaseResources;
   attachmentReader: AttachmentReader;
+  cannedReplies: CannedReplyTools;
 }
 
 export type ContentBlock =

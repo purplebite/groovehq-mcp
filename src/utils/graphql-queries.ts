@@ -441,6 +441,32 @@ export const queries = {
     }
   `,
 
+  listCannedReplies: `
+    query ListCannedReplies($first: Int, $after: String, $filter: CannedReplyFilter) {
+      cannedReplies(first: $first, after: $after, filter: $filter) {
+        totalCount
+        nodes {
+          id
+          name
+          subject
+          snippet
+          body
+          category {
+            id
+            name
+          }
+          mailboxIds
+          countUsed
+          lastUsedAt
+        }
+        pageInfo {
+          hasNextPage
+          endCursor
+        }
+      }
+    }
+  `,
+
   listTeams: `
     query ListTeams($first: Int, $after: String) {
       teams(first: $first, after: $after) {

@@ -34,6 +34,7 @@ Both repos use Groove's REST API for conversations. This one runs on GraphQL onl
 - `editNote`, `reactToNote`, `deleteNote`: change, react to, or remove an internal note
 - Attach files to mail, notes, and logged tickets with `attachments`, from a public `https` link or as base64. Off by default
 - `createReplyDraft`: save a reply or note as a draft for someone to review. It never sends
+- `listCannedReplies`: the team's saved replies, to reuse their wording in a reply or draft
 - `listDrafts`, `deleteDraft`: see and remove your own drafts
 
 **Everything else**

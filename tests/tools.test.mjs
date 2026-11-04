@@ -64,6 +64,7 @@ function respond(query, variables = {}) {
       ? { nodes: [{ change: { id: 'msg_1', createdAt: '2020-01-01T00:00:00Z', body: 'Hi' } }], pageInfo: page }
       : { nodes: [], pageInfo: page },
     customFields: { nodes: [], pageInfo: page },
+    cannedReplies: list({ id: 'cr_1', name: 'Welcome', body: 'Hi', category: { id: 'crc_1', name: 'General' } }),
     me: agent,
   };
   return { data: { [field]: data[field] ?? null } };
@@ -124,6 +125,7 @@ const normalPaths = [
   ['sendMessage', { conversationId: '1', to: 'a@example.com', body: 'Hi' }, 'ConversationReply', r => expect(r).toBeTruthy()],
   ['createNote', { conversationId: '1', body: 'Note' }, 'ConversationAddNote', r => expect(r.id).toBe('cnv_1')],
   ['listDrafts', {}, 'ListDrafts', r => expect(r[0].draftId).toBe('dr_1')],
+  ['listCannedReplies', { keywords: 'welcome' }, 'ListCannedReplies', r => expect(r).toMatchObject({ totalCount: 1, cannedReplies: [{ id: 'cr_1' }] })],
   ['createReplyDraft', { conversationId: '1', body: 'Draft' }, 'DraftUpsert', r => expect(r).toBeTruthy()],
   ['deleteDraft', { draftId: 'dr_1', conversationId: '1' }, 'DraftDelete', r => expect(r).toBeTruthy()],
   ['listContacts', {}, 'ListContacts', r => expect(r.contacts[0].id).toBe('co_1')],
@@ -609,5 +611,13 @@ describe('listConversations with every filter', () => {
     const result = await call('listConversations', { starred: 'yes' });
     expect(result.isError).toBe(true);
     expect(result.json.error).toBe('starred must be true or false');
+  });
+});
+
+describe('saved replies', () => {
+  test('keywords and categories go to Groove as a filter', async () => {
+    await call('listCannedReplies', { keywords: 'vakantie', categoryIds: ['crc_1'], limit: 5 });
+    const sent = requests.find(r => r.operation === 'ListCannedReplies').variables;
+    expect(sent).toMatchObject({ first: 5, filter: { keywords: 'vakantie', categoryIds: ['crc_1'] } });
   });
 });
