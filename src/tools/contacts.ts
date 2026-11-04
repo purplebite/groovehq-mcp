@@ -125,8 +125,38 @@ function toCustomFields(args: Partial<Record<keyof typeof CUSTOM_FIELD_KEYS, str
   return fields;
 }
 
+// The custom profile is HTML for Groove's sidebar; a model reads it better as plain lines
+export function profileText(html: string): string {
+  const named: Record<string, string> = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ' };
+  return html
+    .replace(/<(style|script)\b[\s\S]*?<\/\1>/gi, '')
+    .replace(/<li\b[^>]*>/gi, '\n- ')
+    .replace(/<br\s*\/?>|<\/(p|div|li|h[1-6]|tr|ul|ol|table)>/gi, '\n')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&(#\d+|#x[0-9a-f]+|[a-z]+);/gi, (match, entity: string) => {
+      if (entity[0] !== '#') return named[entity.toLowerCase()] ?? match;
+      const code = entity[1].toLowerCase() === 'x' ? parseInt(entity.slice(2), 16) : parseInt(entity.slice(1), 10);
+      return String.fromCodePoint(code);
+    })
+    .split('\n')
+    .map(line => line.replace(/[ \t]+/g, ' ').trim())
+    .filter(line => line && line !== '-')
+    .join('\n');
+}
+
 export class ContactTools {
   constructor(private client: GrooveClient) {}
+
+  async getContactProfile(args: { contactId: string; channelId?: string; refresh?: boolean }) {
+    const response = await this.client.request<{ customProfile: unknown }>(queries.getCustomProfile, {
+      contactId: args.contactId,
+      channelId: args.channelId,
+      hardRefresh: args.refresh,
+    });
+    const value = response.customProfile;
+    const text = typeof value === 'string' ? profileText(value) : value == null ? '' : JSON.stringify(value, null, 2);
+    return { contactId: args.contactId, profile: text || 'This contact has no custom profile, or it is empty' };
+  }
 
   async listContacts(args: ListContactsArgs = {}): Promise<ListContactsResult> {
     if (args.orphansOnly) return this.listOrphans(args);
@@ -742,6 +772,33 @@ export const deleteContacts = defineTool<DeleteContactsArgs>({
     required: ['contactIds'],
   },
   handler: (args, { contacts }) => contacts.deleteContacts(args),
+});
+
+export const getContactProfile = defineTool<{ contactId: string; channelId?: string; refresh?: boolean }>({
+  name: 'getContactProfile',
+  setting: 'read',
+  annotations: READ_TOOL,
+  description:
+    "Get the extra details your own integration shows next to a contact in Groove (Groove's custom profile), as plain text",
+  inputSchema: {
+    type: 'object',
+    properties: {
+      contactId: {
+        type: 'string',
+        description: 'The contact ID (co_...)',
+      },
+      channelId: {
+        type: 'string',
+        description: 'The mailbox the profile is shown in, if it differs per mailbox',
+      },
+      refresh: {
+        type: 'boolean',
+        description: 'Ask the integration for fresh details instead of what Groove has stored',
+      },
+    },
+    required: ['contactId'],
+  },
+  handler: (args, { contacts }) => contacts.getContactProfile(args),
 });
 
 export const getContact = defineTool<{ id: string }>({

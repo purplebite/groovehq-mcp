@@ -523,6 +523,12 @@ export const queries = {
     }
   `,
 
+  getCustomProfile: `
+    query GetCustomProfile($contactId: ID!, $channelId: ID, $hardRefresh: Boolean) {
+      customProfile(contactId: $contactId, channelId: $channelId, hardRefresh: $hardRefresh)
+    }
+  `,
+
   listTeams: `
     query ListTeams($first: Int, $after: String) {
       teams(first: $first, after: $after) {

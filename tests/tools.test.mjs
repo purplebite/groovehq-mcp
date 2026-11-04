@@ -64,6 +64,7 @@ function respond(query, variables = {}) {
       ? { nodes: [{ change: { id: 'msg_1', createdAt: '2020-01-01T00:00:00Z', body: 'Hi' } }], pageInfo: page }
       : { nodes: [], pageInfo: page },
     customFields: { nodes: [], pageInfo: page },
+    customProfile: '<h3>Otys</h3><style>.x { color: red }</style><ul><li>Status: <b>Active</b></li><li>Recruiter &amp; owner: Kees</li></ul>',
     rawEmail: { headers: [{ name: 'From', value: 'a@example.com' }], bodyPlainText: 'Hello' },
     rules: {
       nodes: [
@@ -144,6 +145,7 @@ const normalPaths = [
   ['deleteContact', { email: 'a@example.com', confirm: true }, 'ContactDelete', r => expect(r).toMatchObject({ deleted: true })],
   ['deleteContacts', { contactIds: ['co_1'], confirm: true }, 'ContactDelete', r => expect(r).toMatchObject({ confirmed: true })],
   ['getContact', { id: 'co_1' }, 'GetContact', r => expect(r.email).toBe('a@example.com')],
+  ['getContactProfile', { contactId: 'co_1' }, 'GetCustomProfile', r => expect(r.profile).toBe('Otys\n- Status: Active\n- Recruiter & owner: Kees')],
   ['createContact', { email: 'new@example.com' }, 'ContactCreate', r => expect(r.id).toBe('co_1')],
   ['updateContact', { id: 'co_1', firstName: 'B' }, 'CustomFieldValuesUpdate', r => expect(r).toBeTruthy()],
   ['listAgents', {}, 'ListAgents', r => expect(r[0].id).toBe('ag_1')],
@@ -665,5 +667,17 @@ describe('original email', () => {
     const result = await call('getRawEmail', { messageId: 'msg_1' }, ALL_ON, answer);
     expect(result.json.bodyPlainText).toContain('[truncated at 100000 chars]');
     expect(result.json.bodyPlainText.length).toBeLessThan(100100);
+  });
+});
+
+describe('contact profile', () => {
+  test('an empty profile says so', async () => {
+    const result = await call('getContactProfile', { contactId: 'co_1' }, ALL_ON, query => (query.includes('GetCustomProfile') ? { data: { customProfile: '<div class="x">\n\n</div>' } } : undefined));
+    expect(result.json.profile).toBe('This contact has no custom profile, or it is empty');
+  });
+
+  test('refresh and mailbox go to Groove', async () => {
+    await call('getContactProfile', { contactId: 'co_1', channelId: 'ch_1', refresh: true });
+    expect(requests.find(r => r.operation === 'GetCustomProfile').variables).toEqual({ contactId: 'co_1', channelId: 'ch_1', hardRefresh: true });
   });
 });

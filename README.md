@@ -41,6 +41,7 @@ Both repos use Groove's REST API for conversations. This one runs on GraphQL onl
 **Everything else**
 
 - `listContacts`, `getContact`, `createContact`, `updateContact`
+- `getContactProfile`: the extra details your own integration shows next to a contact in Groove, as plain text
 - `mergeContacts`: merge a typo or duplicate contact into the right one. This can't be undone
 - `deleteContact`, `deleteContacts`: delete contacts without tickets, which also removes them from recipient suggestions. This can't be undone
 - `listCompanies`, `updateCompany`: find companies, and change a company's name or extra domains

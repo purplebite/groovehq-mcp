@@ -80,6 +80,7 @@ const TOOLS: Tool[] = [
   contacts.deleteContact,
   contacts.deleteContacts,
   contacts.getContact,
+  contacts.getContactProfile,
   contacts.createContact,
   contacts.updateContact,
   agents.listAgents,
