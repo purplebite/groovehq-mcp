@@ -5,7 +5,7 @@ import { createGrooveServer } from '../dist/server.js';
 
 const READ = [
   'getAgent', 'getAttachment', 'getChannel', 'getContact', 'getConversation', 'listAgents', 'listCannedReplies', 'listChannels', 'listCompanies',
-  'listContacts', 'listConversations', 'listDrafts', 'listFolders', 'listMessages', 'listTags', 'listTeams',
+  'listContacts', 'listConversations', 'listDrafts', 'listFolders', 'listMessages', 'listRules', 'listTags', 'listTeams',
   'searchKbArticles',
 ];
 const ADDITIVE = [

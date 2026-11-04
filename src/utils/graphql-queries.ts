@@ -467,6 +467,50 @@ export const queries = {
     }
   `,
 
+  listRules: `
+    query ListRules($first: Int, $after: String, $filter: RuleFilter) {
+      rules(first: $first, after: $after, filter: $filter) {
+        nodes {
+          id
+          name
+          description
+          state
+          matchType
+          mailboxScope
+          mailboxIds
+          position
+          stopUpcoming
+          lastRunAt
+          totalExecutions
+          triggers(first: 20) {
+            nodes {
+              type
+              settings
+            }
+          }
+          conditions(first: 50) {
+            nodes {
+              param
+              operator
+              value
+            }
+          }
+          actions(first: 50) {
+            nodes {
+              type
+              value
+              toAgent
+            }
+          }
+        }
+        pageInfo {
+          hasNextPage
+          endCursor
+        }
+      }
+    }
+  `,
+
   listTeams: `
     query ListTeams($first: Int, $after: String) {
       teams(first: $first, after: $after) {

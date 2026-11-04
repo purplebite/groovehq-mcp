@@ -17,6 +17,7 @@ import * as folders from './tools/folders.js';
 import * as drafts from './tools/drafts.js';
 import * as attachmentReader from './tools/attachment-reader/index.js';
 import * as cannedReplies from './tools/canned-replies.js';
+import * as rules from './tools/rules.js';
 import * as kb from './resources/kb-articles.js';
 import {
   ATTACHMENTS_SCHEMA,
@@ -86,6 +87,7 @@ const TOOLS: Tool[] = [
   tags.listTags,
   teams.listTeams,
   folders.listFolders,
+  rules.listRules,
   channels.listChannels,
   channels.getChannel,
 ];
@@ -180,6 +182,7 @@ export function createGrooveServer(opts: GrooveServerOptions): Server {
     kb: kbResources,
     attachmentReader: new attachmentReader.AttachmentReader(),
     cannedReplies: new cannedReplies.CannedReplyTools(grooveClient),
+    rules: new rules.RuleTools(grooveClient),
   };
 
   const server = new Server(

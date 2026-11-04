@@ -64,6 +64,13 @@ function respond(query, variables = {}) {
       ? { nodes: [{ change: { id: 'msg_1', createdAt: '2020-01-01T00:00:00Z', body: 'Hi' } }], pageInfo: page }
       : { nodes: [], pageInfo: page },
     customFields: { nodes: [], pageInfo: page },
+    rules: {
+      nodes: [
+        { id: 'ru_2', name: 'Second', position: 2, triggers: null, conditions: { nodes: [] }, actions: { nodes: [] } },
+        { id: 'ru_1', name: 'First', position: 1, triggers: { nodes: [{ type: 'CREATED' }] }, conditions: { nodes: [{ param: 'SUBJECT', operator: 'CONTAINS', value: 'x' }] }, actions: { nodes: [{ type: 'ADD_TAG', value: 'tag_1' }] } },
+      ],
+      pageInfo: page,
+    },
     cannedReplies: list({ id: 'cr_1', name: 'Welcome', body: 'Hi', category: { id: 'crc_1', name: 'General' } }),
     me: agent,
   };
@@ -143,6 +150,7 @@ const normalPaths = [
   ['listTags', {}, 'ListTags', r => expect(r[0].id).toBe('tag_1')],
   ['listTeams', {}, 'ListTeams', r => expect(r[0].id).toBe('tm_1')],
   ['listFolders', {}, 'ListFolders', r => expect(r[0].id).toBe('fo_1')],
+  ['listRules', {}, 'ListRules', r => expect(r.map(rule => rule.id)).toEqual(['ru_1', 'ru_2'])],
   ['listChannels', {}, 'ListChannels', r => expect(r[0].id).toBe('ch_1')],
   ['getChannel', { id: 'ch_1' }, 'GetChannel', r => expect(r.id).toBe('ch_1')],
 ];
@@ -619,5 +627,26 @@ describe('saved replies', () => {
     await call('listCannedReplies', { keywords: 'vakantie', categoryIds: ['crc_1'], limit: 5 });
     const sent = requests.find(r => r.operation === 'ListCannedReplies').variables;
     expect(sent).toMatchObject({ first: 5, filter: { keywords: 'vakantie', categoryIds: ['crc_1'] } });
+  });
+});
+
+describe('rules', () => {
+  test('come back in run order, with their parts as plain lists', async () => {
+    const result = await call('listRules', {});
+    expect(result.json[0]).toMatchObject({
+      id: 'ru_1',
+      triggers: [{ type: 'CREATED' }],
+      conditions: [{ param: 'SUBJECT', operator: 'CONTAINS', value: 'x' }],
+      actions: [{ type: 'ADD_TAG', value: 'tag_1' }],
+    });
+    expect(result.json[1]).toMatchObject({ id: 'ru_2', triggers: [], conditions: [], actions: [] });
+  });
+
+  test('state goes to Groove in capitals, and anything else is refused', async () => {
+    await call('listRules', { state: 'inactive' });
+    expect(requests.find(r => r.operation === 'ListRules').variables.filter).toEqual({ state: 'INACTIVE' });
+    const result = await call('listRules', { state: 'paused' });
+    expect(result.isError).toBe(true);
+    expect(result.json.error).toBe('state must be active or inactive');
   });
 });

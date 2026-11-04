@@ -46,6 +46,7 @@ Both repos use Groove's REST API for conversations. This one runs on GraphQL onl
 - `listAgents`, `getAgent`: agents and the teams they're in
 - `listChannels`, `getChannel`
 - `listFolders`: see the Smart Folders you can use in `listConversations`
+- `listRules`: read Groove's automatic rules, to see why a ticket got a tag, an assignee, or a status
 - `listTags`, `listTeams`. With `includeMembers`, `listTeams` also lists who is in each team
 - `searchKbArticles`
 
