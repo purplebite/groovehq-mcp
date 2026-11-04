@@ -194,7 +194,7 @@ export function createGrooveServer(opts: GrooveServerOptions): Server {
   const server = new Server(
     {
       name: 'groovehq-mcp',
-      version: '0.15.0',
+      version: '0.16.0',
     },
     {
       capabilities: {
