@@ -959,6 +959,10 @@ export const mutations = {
         conversation {
           ${CONVERSATION_FIELDS}
         }
+        message {
+          id
+          body
+        }
         errors {
           message
           path

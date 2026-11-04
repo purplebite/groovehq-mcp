@@ -796,3 +796,19 @@ describe('moving a message', () => {
     expect(result.json.error).toBe('Groove did not move message msg_1');
   });
 });
+
+describe('sent reply', () => {
+  test('sendMessage returns the reply as Groove stored it', async () => {
+    const answer = query =>
+      query.includes('ConversationReply')
+        ? { data: { conversationReply: { changesetId: 'cs_1', conversation: ticket, message: { id: 'msg_5', body: '<p>Hi</p>' }, errors: [] } } }
+        : undefined;
+    const result = await call('sendMessage', { conversationId: '1', to: 'a@example.com', body: '<p>Hi</p>' }, ALL_ON, answer);
+    expect(result.json).toMatchObject({ id: 'cnv_1', changesetId: 'cs_1', reply: { id: 'msg_5', body: '<p>Hi</p>' } });
+  });
+
+  test('the query asks Groove for the reply', async () => {
+    await call('sendMessage', { conversationId: '1', to: 'a@example.com', body: 'Hi' });
+    expect(requests.find(r => r.operation === 'ConversationReply')).toBeDefined();
+  });
+});

@@ -123,7 +123,7 @@ export class MessageTools {
       channelId = node?.channel?.id;
     }
 
-    const payload = await this.client.mutate<{ conversation: Conversation; changesetId: string }>(
+    const payload = await this.client.mutate<{ conversation: Conversation; changesetId: string; message: { id: string; body: string } | null }>(
       mutations.conversationReply,
       'conversationReply',
       {
@@ -138,7 +138,8 @@ export class MessageTools {
       }
     );
 
-    return { ...payload.conversation, changesetId: payload.changesetId };
+    // The reply as Groove stored it, so the caller can check what went out
+    return { ...payload.conversation, changesetId: payload.changesetId, reply: payload.message ?? undefined };
   }
 
   async undoSend(conversationId: string, changesetId: string) {
@@ -370,7 +371,7 @@ export const sendMessage = defineTool<SendMessageArgs>({
   name: 'sendMessage',
   setting: 'send',
   annotations: DESTRUCTIVE_TOOL,
-  description: 'SENDS AN EMAIL IMMEDIATELY as a reply on a ticket. Use only when the user explicitly asks to send this message; to prepare a reply for review, use createReplyDraft.',
+  description: 'SENDS AN EMAIL IMMEDIATELY as a reply on a ticket. Use only when the user explicitly asks to send this message; to prepare a reply for review, use createReplyDraft. Returns the ticket and the reply as Groove stored it.',
   inputSchema: ({ authorField, attachmentsField }) => ({
     type: 'object',
     properties: {

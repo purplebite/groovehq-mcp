@@ -4434,7 +4434,7 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
         "destructiveHint": true,
         "readOnlyHint": false,
       },
-      "description": "SENDS AN EMAIL IMMEDIATELY as a reply on a ticket. Use only when the user explicitly asks to send this message; to prepare a reply for review, use createReplyDraft.",
+      "description": "SENDS AN EMAIL IMMEDIATELY as a reply on a ticket. Use only when the user explicitly asks to send this message; to prepare a reply for review, use createReplyDraft. Returns the ticket and the reply as Groove stored it.",
       "inputSchema": {
         "properties": {
           "bcc": {
@@ -4478,7 +4478,7 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
         "destructiveHint": true,
         "readOnlyHint": false,
       },
-      "description": "SENDS AN EMAIL IMMEDIATELY as a reply on a ticket. Use only when the user explicitly asks to send this message; to prepare a reply for review, use createReplyDraft.",
+      "description": "SENDS AN EMAIL IMMEDIATELY as a reply on a ticket. Use only when the user explicitly asks to send this message; to prepare a reply for review, use createReplyDraft. Returns the ticket and the reply as Groove stored it.",
       "inputSchema": {
         "properties": {
           "authorId": {
@@ -4526,7 +4526,7 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
         "destructiveHint": true,
         "readOnlyHint": false,
       },
-      "description": "SENDS AN EMAIL IMMEDIATELY as a reply on a ticket. Use only when the user explicitly asks to send this message; to prepare a reply for review, use createReplyDraft.",
+      "description": "SENDS AN EMAIL IMMEDIATELY as a reply on a ticket. Use only when the user explicitly asks to send this message; to prepare a reply for review, use createReplyDraft. Returns the ticket and the reply as Groove stored it.",
       "inputSchema": {
         "properties": {
           "attachments": {
@@ -4598,7 +4598,7 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
         "destructiveHint": true,
         "readOnlyHint": false,
       },
-      "description": "SENDS AN EMAIL IMMEDIATELY as a reply on a ticket. Use only when the user explicitly asks to send this message; to prepare a reply for review, use createReplyDraft.",
+      "description": "SENDS AN EMAIL IMMEDIATELY as a reply on a ticket. Use only when the user explicitly asks to send this message; to prepare a reply for review, use createReplyDraft. Returns the ticket and the reply as Groove stored it.",
       "inputSchema": {
         "properties": {
           "attachments": {
