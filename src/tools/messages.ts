@@ -99,13 +99,15 @@ export class MessageTools {
     };
   }
 
-  // Groove only moves a message into a ticket of its own; mergeConversations puts it back
+  // Groove only moves a message into a ticket of its own; mergeConversations puts it back.
+  // listMessages on the old ticket still shows the moved message, as it does for other moved mail
   async moveMessageToNewTicket(args: { messageId: string }) {
     const payload = await this.client.mutate<{ conversation: { id: string; number: number; subject: string | null } }>(
       mutations.conversationMoveMessage,
       'conversationMoveMessage',
       { messageId: args.messageId },
     );
+    if (!payload.conversation) throw new Error(`Groove did not move message ${args.messageId}`);
     return { moved: args.messageId, newTicket: payload.conversation };
   }
 
@@ -350,7 +352,7 @@ export const moveMessageToNewTicket = defineTool<{ messageId: string }>({
   setting: 'write',
   annotations: ADDITIVE_TOOL,
   description:
-    'Take one message out of its ticket and make it a new ticket, for example when a customer raises something new in an old thread. Groove can only move it to a new ticket; to put it back, merge the new ticket into the old one with mergeConversations',
+    'Take one message out of its ticket and make it a new ticket, for example when a customer raises something new in an old thread. Groove can only move it to a new ticket. To put it back, merge the new ticket into the old one with mergeConversations; Groove refuses that for the first few minutes after the move ("a message waiting to be sent")',
   inputSchema: {
     type: 'object',
     properties: {

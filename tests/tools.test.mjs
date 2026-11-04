@@ -787,3 +787,12 @@ describe('tagging colleagues in a note', () => {
     expect(result.json.note.id).toBe('msg_9');
   });
 });
+
+describe('moving a message', () => {
+  test('no new ticket in the answer is an error', async () => {
+    const answer = query => (query.includes('ConversationMoveMessage') ? { data: { conversationMoveMessage: { conversation: null } } } : undefined);
+    const result = await call('moveMessageToNewTicket', { messageId: 'msg_1' }, ALL_ON, answer);
+    expect(result.isError).toBe(true);
+    expect(result.json.error).toBe('Groove did not move message msg_1');
+  });
+});

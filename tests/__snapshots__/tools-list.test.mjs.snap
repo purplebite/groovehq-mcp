@@ -4341,7 +4341,7 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
         "destructiveHint": false,
         "readOnlyHint": false,
       },
-      "description": "Take one message out of its ticket and make it a new ticket, for example when a customer raises something new in an old thread. Groove can only move it to a new ticket; to put it back, merge the new ticket into the old one with mergeConversations",
+      "description": "Take one message out of its ticket and make it a new ticket, for example when a customer raises something new in an old thread. Groove can only move it to a new ticket. To put it back, merge the new ticket into the old one with mergeConversations; Groove refuses that for the first few minutes after the move ("a message waiting to be sent")",
       "inputSchema": {
         "properties": {
           "messageId": {

@@ -750,6 +750,7 @@ export const mutations = {
     }
   `,
 
+  // No errors field: Groove answers null for it after a successful move, which GraphQL turns into an error
   conversationMoveMessage: `
     mutation ConversationMoveMessage($input: ConversationMoveMessageInput!) {
       conversationMoveMessage(input: $input) {
@@ -757,10 +758,6 @@ export const mutations = {
           id
           number
           subject
-        }
-        errors {
-          message
-          path
         }
       }
     }
