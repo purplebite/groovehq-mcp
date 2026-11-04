@@ -511,6 +511,18 @@ export const queries = {
     }
   `,
 
+  getRawEmail: `
+    query GetRawEmail($messageId: ID!) {
+      rawEmail(messageId: $messageId) {
+        headers {
+          name
+          value
+        }
+        bodyPlainText
+      }
+    }
+  `,
+
   listTeams: `
     query ListTeams($first: Int, $after: String) {
       teams(first: $first, after: $after) {

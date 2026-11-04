@@ -6,6 +6,8 @@ import { AgentTools } from './agents.js';
 import { AttachmentArg, uploadAttachments } from './attachments.js';
 import { defineTool, ADDITIVE_TOOL, DESTRUCTIVE_TOOL, READ_TOOL } from './definition.js';
 
+const MAX_RAW_CHARS = 100000;
+
 interface ListMessagesArgs {
   conversationId: string;
   limit?: number;
@@ -77,6 +79,20 @@ export class MessageTools {
       delete plain.body;
       return plain as Omit<Message, 'body'>;
     });
+  }
+
+  // The mail as it arrived, for checking where it really came from. Notes and some messages have none
+  async getRawEmail(args: { messageId: string }) {
+    const response = await this.client.request<{
+      rawEmail: { headers: Array<{ name: string; value: string }> | null; bodyPlainText: string | null } | null;
+    }>(queries.getRawEmail, { messageId: args.messageId });
+    if (!response.rawEmail) throw new Error(`No original email for message ${args.messageId}; notes and messages written in Groove have none`);
+    const text = response.rawEmail.bodyPlainText ?? '';
+    return {
+      messageId: args.messageId,
+      headers: response.rawEmail.headers ?? [],
+      bodyPlainText: text.length > MAX_RAW_CHARS ? `${text.slice(0, MAX_RAW_CHARS)}\n\n[truncated at ${MAX_RAW_CHARS} chars]` : text,
+    };
   }
 
   async sendMessage(args: SendMessageArgs) {
@@ -277,6 +293,25 @@ export const listMessages = defineTool<ListMessagesArgs>({
     required: ['conversationId'],
   },
   handler: (args, { messages }) => messages.listMessages(args),
+});
+
+export const getRawEmail = defineTool<{ messageId: string }>({
+  name: 'getRawEmail',
+  setting: 'read',
+  annotations: READ_TOOL,
+  description:
+    'Get the original email behind a message, with all its headers (Received, From, Return-Path, authentication results), to check where a mail really came from, for example with phishing or delivery problems',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      messageId: {
+        type: 'string',
+        description: 'The message ID from listMessages (msg_...)',
+      },
+    },
+    required: ['messageId'],
+  },
+  handler: (args, { messages }) => messages.getRawEmail(args),
 });
 
 export const sendMessage = defineTool<SendMessageArgs>({

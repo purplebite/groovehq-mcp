@@ -65,6 +65,7 @@ const TOOLS: Tool[] = [
   conversations.mergeConversations,
   conversations.closeConversation,
   messages.listMessages,
+  messages.getRawEmail,
   attachmentReader.getAttachment,
   messages.sendMessage,
   messages.createNote,

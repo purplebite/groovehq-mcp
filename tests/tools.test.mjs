@@ -64,6 +64,7 @@ function respond(query, variables = {}) {
       ? { nodes: [{ change: { id: 'msg_1', createdAt: '2020-01-01T00:00:00Z', body: 'Hi' } }], pageInfo: page }
       : { nodes: [], pageInfo: page },
     customFields: { nodes: [], pageInfo: page },
+    rawEmail: { headers: [{ name: 'From', value: 'a@example.com' }], bodyPlainText: 'Hello' },
     rules: {
       nodes: [
         { id: 'ru_2', name: 'Second', position: 2, triggers: null, conditions: { nodes: [] }, actions: { nodes: [] } },
@@ -129,6 +130,7 @@ const normalPaths = [
   ['mergeConversations', { sourceId: '2', targetId: '3' }, 'ConversationMerge', r => expect(r).toBeTruthy()],
   ['closeConversation', { id: '1' }, 'ConversationClose', r => expect(r.id).toBe('cnv_1')],
   ['listMessages', { conversationId: '1' }, 'ListEvents', r => expect(r[0].id).toBe('msg_1')],
+  ['getRawEmail', { messageId: 'msg_1' }, 'GetRawEmail', r => expect(r.headers[0]).toEqual({ name: 'From', value: 'a@example.com' })],
   ['sendMessage', { conversationId: '1', to: 'a@example.com', body: 'Hi' }, 'ConversationReply', r => expect(r).toBeTruthy()],
   ['createNote', { conversationId: '1', body: 'Note' }, 'ConversationAddNote', r => expect(r.id).toBe('cnv_1')],
   ['listDrafts', {}, 'ListDrafts', r => expect(r[0].draftId).toBe('dr_1')],
@@ -648,5 +650,20 @@ describe('rules', () => {
     const result = await call('listRules', { state: 'paused' });
     expect(result.isError).toBe(true);
     expect(result.json.error).toBe('state must be active or inactive');
+  });
+});
+
+describe('original email', () => {
+  test('a message without one says so', async () => {
+    const result = await call('getRawEmail', { messageId: 'msg_9' }, ALL_ON, query => (query.includes('GetRawEmail') ? { data: { rawEmail: null } } : undefined));
+    expect(result.isError).toBe(true);
+    expect(result.json.error).toContain('No original email for message msg_9');
+  });
+
+  test('a very long body is cut at 100,000 characters', async () => {
+    const answer = query => (query.includes('GetRawEmail') ? { data: { rawEmail: { headers: [], bodyPlainText: 'x'.repeat(150000) } } } : undefined);
+    const result = await call('getRawEmail', { messageId: 'msg_1' }, ALL_ON, answer);
+    expect(result.json.bodyPlainText).toContain('[truncated at 100000 chars]');
+    expect(result.json.bodyPlainText.length).toBeLessThan(100100);
   });
 });

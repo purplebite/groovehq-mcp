@@ -28,6 +28,7 @@ Both repos use Groove's REST API for conversations. This one runs on GraphQL onl
 
 - `listMessages`: every message and note on a ticket, oldest first. Ask for only the first or last few, and for plain text without the HTML
 - `getAttachment`: read an attachment from `listMessages`, up to 10 MB. PDF, Word, Excel and PowerPoint files come back as text, images as images, and a zip as a list of its files. Groove's robots.txt blocks automated access to its file links, so clients like Claude can't open them themselves
+- `getRawEmail`: the original email behind a message, with all its headers, to check where a mail really came from
 - `sendMessage`: send an email reply
 - `undoSend`: cancel a mail right after sending it
 - `createNote`: leave an internal note
