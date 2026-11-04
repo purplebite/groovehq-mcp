@@ -95,6 +95,16 @@ export class MessageTools {
     };
   }
 
+  // Groove only moves a message into a ticket of its own; mergeConversations puts it back
+  async moveMessageToNewTicket(args: { messageId: string }) {
+    const payload = await this.client.mutate<{ conversation: { id: string; number: number; subject: string | null } }>(
+      mutations.conversationMoveMessage,
+      'conversationMoveMessage',
+      { messageId: args.messageId },
+    );
+    return { moved: args.messageId, newTicket: payload.conversation };
+  }
+
   async sendMessage(args: SendMessageArgs) {
     const conversationId = await this.client.resolveConversationId(args.conversationId);
     let channelId: string | undefined;
@@ -312,6 +322,25 @@ export const getRawEmail = defineTool<{ messageId: string }>({
     required: ['messageId'],
   },
   handler: (args, { messages }) => messages.getRawEmail(args),
+});
+
+export const moveMessageToNewTicket = defineTool<{ messageId: string }>({
+  name: 'moveMessageToNewTicket',
+  setting: 'write',
+  annotations: ADDITIVE_TOOL,
+  description:
+    'Take one message out of its ticket and make it a new ticket, for example when a customer raises something new in an old thread. Groove can only move it to a new ticket; to put it back, merge the new ticket into the old one with mergeConversations',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      messageId: {
+        type: 'string',
+        description: 'The message ID from listMessages (msg_...)',
+      },
+    },
+    required: ['messageId'],
+  },
+  handler: (args, { messages }) => messages.moveMessageToNewTicket(args),
 });
 
 export const sendMessage = defineTool<SendMessageArgs>({

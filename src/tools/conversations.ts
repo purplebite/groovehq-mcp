@@ -22,6 +22,8 @@ interface LinkResourceArgs {
   remove?: boolean;
 }
 
+const MAX_BULK_DELETE = 100;
+
 type ConversationStateArg = 'unread' | 'opened' | 'closed' | 'snoozed' | 'spam';
 
 interface ListConversationsArgs {
@@ -457,6 +459,19 @@ export class ConversationTools {
   async deleteConversation(id: string) {
     await this.removeConversation(id, 'SOFT');
     return { deleted: true, ticket: id };
+  }
+
+  // Several at once, in one call to Groove. Like deleteConversation, restoreConversation brings each one back
+  async deleteConversations(ids: string[]) {
+    if (!ids.length) throw new Error('Give at least one ticket');
+    if (ids.length > MAX_BULK_DELETE) throw new Error(`At most ${MAX_BULK_DELETE} tickets per call`);
+    const conversationIds: string[] = [];
+    for (const id of ids) conversationIds.push(await this.client.resolveConversationId(id));
+    const payload = await this.client.mutate<{ deletedConversationIds: string[] }>(mutations.conversationDelete, 'conversationDelete', {
+      conversationIds,
+      deleteMode: 'SOFT',
+    });
+    return { deleted: payload.deletedConversationIds ?? conversationIds, count: (payload.deletedConversationIds ?? conversationIds).length };
   }
 
   async deleteConversationPermanently(id: string) {
@@ -1020,6 +1035,26 @@ export const deleteConversation = defineTool<{ id: string }>({
     required: ['id'],
   },
   handler: (args, { conversations }) => conversations.deleteConversation(args.id),
+});
+
+export const deleteConversations = defineTool<{ ids: string[] }>({
+  name: 'deleteConversations',
+  setting: 'write',
+  annotations: ADDITIVE_TOOL,
+  description:
+    'Delete up to 100 tickets at once, for example spam or test tickets. They go to the trash like with deleteConversation, and restoreConversation brings each one back',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      ids: {
+        type: 'array',
+        items: { type: 'string' },
+        description: 'Ticket numbers (e.g. 12345) or conversation IDs, at most 100',
+      },
+    },
+    required: ['ids'],
+  },
+  handler: (args, { conversations }) => conversations.deleteConversations(args.ids),
 });
 
 export const deleteConversationPermanently = defineTool<{ id: string }>({

@@ -123,11 +123,13 @@ const normalPaths = [
   ['logConversation', { channelId: 'ch_1', to: 'a@example.com', subject: 's', body: 'b' }, 'ConversationLog', r => expect(r).toMatchObject({ logged: true, sent: false })],
   ['updateConversation', { id: '1', subject: 'New' }, 'ConversationSubject', r => expect(r.id).toBe('cnv_1')],
   ['deleteConversation', { id: '1' }, 'ConversationDelete', r => expect(r).toBeTruthy()],
+  ['deleteConversations', { ids: ['1', '2'] }, 'ConversationDelete', r => expect(r.count).toBe(2)],
   ['deleteConversationPermanently', { id: '1' }, 'ConversationDelete', r => expect(r).toBeTruthy()],
   ['restoreConversation', { id: '1' }, 'ConversationRestore', r => expect(r).toBeTruthy()],
   ['markAsSpam', { id: '1' }, 'ConversationSpam', r => expect(r.id).toBe('cnv_1')],
   ['forwardConversation', { conversationId: '1', to: ['b@example.com'], body: 'See below' }, 'ConversationForwardV2', r => expect(r).toBeTruthy()],
   ['undoSend', { conversationId: '1', changesetId: 'cs_1' }, 'ConversationUndoSend', r => expect(r).toBeTruthy()],
+  ['moveMessageToNewTicket', { messageId: 'msg_1' }, 'ConversationMoveMessage', r => expect(r).toMatchObject({ moved: 'msg_1', newTicket: { id: 'cnv_1', number: 1 } })],
   ['editNote', { messageId: 'msg_1', body: 'Changed' }, 'ConversationEditNote', r => expect(r).toBeTruthy()],
   ['reactToNote', { messageId: 'msg_1', reaction: 'thumbsup' }, 'ConversationToggleNoteReaction', r => expect(r).toBeTruthy()],
   ['deleteNote', { messageId: 'msg_1' }, 'ConversationDeleteNote', r => expect(r).toMatchObject({ deleted: true })],
@@ -712,4 +714,30 @@ describe('links to other systems', () => {
     expect(result.isError).toBe(true);
     expect(result.json.error).toContain('linkResource is disabled');
   });
+});
+
+describe('several tickets at once', () => {
+  test('all go to Groove in one soft delete', async () => {
+    const result = await call('deleteConversations', { ids: ['1', '#2', 'cnv_3'] });
+    const sent = requests.filter(r => r.operation === 'ConversationDelete');
+    expect(sent).toHaveLength(1);
+    expect(sent[0].variables.input).toEqual({ conversationIds: ['cnv_1', 'cnv_2', 'cnv_3'], deleteMode: 'SOFT' });
+    expect(result.json.count).toBe(3);
+  });
+
+  test('Groove says which ones it deleted', async () => {
+    const answer = query => (query.includes('ConversationDelete') ? { data: { conversationDelete: { deletedConversationIds: ['cnv_1'], errors: [] } } } : undefined);
+    const result = await call('deleteConversations', { ids: ['1', '2'] }, ALL_ON, answer);
+    expect(result.json).toEqual({ deleted: ['cnv_1'], count: 1 });
+  });
+
+  test.each([[[], 'Give at least one ticket'], [Array.from({ length: 101 }, (_, i) => String(i + 1)), 'At most 100 tickets per call']])(
+    '%#: a wrong number of tickets is refused before Groove is asked',
+    async (ids, error) => {
+      const result = await call('deleteConversations', { ids });
+      expect(result.isError).toBe(true);
+      expect(result.json.error).toBe(error);
+      expect(result.operations).toEqual([]);
+    },
+  );
 });

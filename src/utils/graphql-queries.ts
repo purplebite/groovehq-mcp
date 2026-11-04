@@ -749,6 +749,22 @@ export const mutations = {
     }
   `,
 
+  conversationMoveMessage: `
+    mutation ConversationMoveMessage($input: ConversationMoveMessageInput!) {
+      conversationMoveMessage(input: $input) {
+        conversation {
+          id
+          number
+          subject
+        }
+        errors {
+          message
+          path
+        }
+      }
+    }
+  `,
+
   conversationSpam: `
     mutation ConversationSpam($input: ConversationSpamInput!) {
       conversationSpam(input: $input) {
