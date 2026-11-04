@@ -555,3 +555,59 @@ describe('listMessages from the start and in plain text', () => {
     },
   );
 });
+
+describe('listConversations with every filter', () => {
+  const sent = () => requests.find(r => r.operation === 'ListConversations').variables.filter;
+
+  test('each filter goes to Groove under its own name', async () => {
+    await call('listConversations', {
+      states: ['opened', 'snoozed'],
+      contactEmail: 'a@example.com',
+      tagNames: ['urgent'],
+      mentionedAgentId: 'ag_1',
+      draftAuthorId: 'ag_2',
+      draftType: 'reply_all',
+      rating: 'bad',
+      starred: false,
+      type: ['email', 'widget'],
+      updatedAfter: '2026-10-01',
+      updatedBefore: '2026-10-31T23:59:59Z',
+    });
+    expect(sent()).toEqual({
+      states: ['OPENED', 'SNOOZED'],
+      contactEmail: 'a@example.com',
+      tagNames: ['urgent'],
+      mentionedAgent: 'ag_1',
+      draftAuthor: 'ag_2',
+      draftType: 'REPLY_ALL',
+      rating: 'BAD',
+      starred: false,
+      type: ['EMAIL', 'WIDGET'],
+      afterUpdatedAt: '2026-10-01T00:00:00.000Z',
+      beforeUpdatedAt: '2026-10-31T23:59:59.000Z',
+    });
+  });
+
+  test('state spam is passed on', async () => {
+    await call('listConversations', { state: 'spam' });
+    expect(sent()).toEqual({ state: 'SPAM' });
+  });
+
+  test('the trash is a filter of its own', async () => {
+    await call('listConversations', { deleted: true });
+    expect(sent()).toEqual({ deleted: true });
+  });
+
+  test('an update date that is not a date is refused before Groove is asked', async () => {
+    const result = await call('listConversations', { updatedBefore: 'yesterday' });
+    expect(result.isError).toBe(true);
+    expect(result.json.error).toContain('updatedBefore must be a date');
+    expect(result.operations).toEqual([]);
+  });
+
+  test('starred must be true or false', async () => {
+    const result = await call('listConversations', { starred: 'yes' });
+    expect(result.isError).toBe(true);
+    expect(result.json.error).toBe('starred must be true or false');
+  });
+});

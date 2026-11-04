@@ -45,7 +45,7 @@ export type Setting = 'read' | 'write' | 'send' | 'merge' | 'permanentDelete' | 
 
 export interface PropertySchema {
   type?: string;
-  items?: { type?: string };
+  items?: { type?: string; enum?: string[] };
   [key: string]: unknown;
 }
 

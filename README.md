@@ -12,7 +12,7 @@ Both repos use Groove's REST API for conversations. This one runs on GraphQL onl
 
 **Tickets**
 
-- `listConversations`: search and filter by keyword, state, agent, team, contact, channel, tag, Smart Folder, or creation date, and sort by date. It also gives the total number of matching tickets, so a count takes one call
+- `listConversations`: search and filter by keyword, state, agent, team, contact or their email address, channel, tag, Smart Folder, @mention, draft, rating, star, trash, how the ticket came in, or creation and update date, and sort by date. It also gives the total number of matching tickets, so a count takes one call
 - `getConversation`: get one ticket
 - `createConversation`: start a new ticket by sending an email, in a chosen `state`
 - `logConversation`: Groove's Log a Conversation. Start a ticket with an internal note, for example after a phone call. It never sends mail

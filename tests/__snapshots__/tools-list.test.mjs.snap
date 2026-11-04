@@ -3038,6 +3038,10 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
             "description": "Filter by channel ID",
             "type": "string",
           },
+          "contactEmail": {
+            "description": "Only tickets from the contact with this email address",
+            "type": "string",
+          },
           "contactId": {
             "description": "Filter by contact ID",
             "type": "string",
@@ -3048,6 +3052,23 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
           },
           "createdBefore": {
             "description": "Only tickets created on or before this moment, as an ISO date or date-time. For all of October, use 2026-10-31T23:59:59Z",
+            "type": "string",
+          },
+          "deleted": {
+            "description": "true for tickets in the trash only, false for tickets outside it",
+            "type": "boolean",
+          },
+          "draftAuthorId": {
+            "description": "Only tickets where this agent has an unsent draft",
+            "type": "string",
+          },
+          "draftType": {
+            "description": "Only tickets with an unsent draft of this kind",
+            "enum": [
+              "reply",
+              "reply_all",
+              "note",
+            ],
             "type": "string",
           },
           "folderId": {
@@ -3062,6 +3083,10 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
             "default": 20,
             "description": "Maximum number of conversations to return per page",
             "type": "number",
+          },
+          "mentionedAgentId": {
+            "description": "Only tickets where this agent was @mentioned in a note",
+            "type": "string",
           },
           "orderBy": {
             "description": "Sort order. STATE_CHANGED_AT with state closed lists recently closed tickets first; each ticket's stateUpdatedAt is its latest state change",
@@ -3089,15 +3114,44 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
             ],
             "type": "object",
           },
+          "rating": {
+            "description": "Only tickets whose latest customer rating is this; any means rated at all",
+            "enum": [
+              "any",
+              "awesome",
+              "ok",
+              "bad",
+            ],
+            "type": "string",
+          },
+          "starred": {
+            "description": "true for starred tickets only, false for tickets without a star",
+            "type": "boolean",
+          },
           "state": {
-            "description": "Filter by conversation state. opened also includes unread, but leaves out snoozed: ask for snoozed separately to see every ticket that still needs work",
+            "description": "Filter by conversation state. opened also includes unread, but leaves out snoozed: ask for snoozed separately to see every ticket that still needs work. For tickets in the trash, use deleted",
             "enum": [
               "unread",
               "opened",
               "closed",
               "snoozed",
+              "spam",
             ],
             "type": "string",
+          },
+          "states": {
+            "description": "Tickets in any of these states, for example ["opened", "snoozed"]. Ignored when state is set",
+            "items": {
+              "enum": [
+                "unread",
+                "opened",
+                "closed",
+                "snoozed",
+                "spam",
+              ],
+              "type": "string",
+            },
+            "type": "array",
           },
           "tagIds": {
             "description": "Filter by tag IDs",
@@ -3105,6 +3159,35 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
               "type": "string",
             },
             "type": "array",
+          },
+          "tagNames": {
+            "description": "Tickets with any of these tag names, without looking up their IDs first",
+            "items": {
+              "type": "string",
+            },
+            "type": "array",
+          },
+          "type": {
+            "description": "Only tickets that came in this way",
+            "items": {
+              "enum": [
+                "email",
+                "chat",
+                "widget",
+                "facebook",
+                "twitter",
+              ],
+              "type": "string",
+            },
+            "type": "array",
+          },
+          "updatedAfter": {
+            "description": "Only tickets updated on or after this moment, as an ISO date or date-time",
+            "type": "string",
+          },
+          "updatedBefore": {
+            "description": "Only tickets updated on or before this moment, as an ISO date or date-time",
+            "type": "string",
           },
         },
         "type": "object",

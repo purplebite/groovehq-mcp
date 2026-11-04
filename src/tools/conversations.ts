@@ -8,17 +8,31 @@ import { AttachmentArg, uploadAttachments } from './attachments.js';
 import { pageGuard } from '../utils/paging.js';
 import { defineTool, ADDITIVE_TOOL, DESTRUCTIVE_TOOL, READ_TOOL } from './definition.js';
 
+type ConversationStateArg = 'unread' | 'opened' | 'closed' | 'snoozed' | 'spam';
+
 interface ListConversationsArgs {
-  state?: 'unread' | 'opened' | 'closed' | 'snoozed';
+  state?: ConversationStateArg;
+  states?: ConversationStateArg[];
   assignedAgentId?: string;
   assignedTeamId?: string;
   contactId?: string;
+  contactEmail?: string;
   channelId?: string;
   folderId?: string;
   tagIds?: string[];
+  tagNames?: string[];
   keywords?: string;
+  mentionedAgentId?: string;
+  draftAuthorId?: string;
+  draftType?: 'reply' | 'reply_all' | 'note';
+  rating?: 'any' | 'awesome' | 'ok' | 'bad';
+  starred?: boolean;
+  deleted?: boolean;
+  type?: Array<'email' | 'chat' | 'widget' | 'facebook' | 'twitter'>;
   createdAfter?: string;
   createdBefore?: string;
+  updatedAfter?: string;
+  updatedBefore?: string;
   orderBy?: {
     field: 'CREATED_AT' | 'UPDATED_AT' | 'STATE_CHANGED_AT' | 'LAST_UNANSWERED_USER_MESSAGE_AT';
     direction?: 'ASC' | 'DESC';
@@ -132,17 +146,41 @@ export class ConversationTools {
   async listConversations(args: ListConversationsArgs): Promise<ListConversationsResult> {
     const filter: {
       state?: string;
+      states?: string[];
       assigned?: { agent?: string; team?: string };
       contactId?: string;
+      contactEmail?: string;
       channelId?: string;
       folderId?: string;
       tags?: string[];
+      tagNames?: string[];
       keywords?: string;
+      mentionedAgent?: string;
+      draftAuthor?: string;
+      draftType?: string;
+      rating?: string;
+      starred?: boolean;
+      deleted?: boolean;
+      type?: string[];
       afterCreatedAt?: string;
       beforeCreatedAt?: string;
+      afterUpdatedAt?: string;
+      beforeUpdatedAt?: string;
     } = {};
 
     if (args.state) filter.state = args.state.toUpperCase();
+    if (args.states?.length) filter.states = args.states.map(state => state.toUpperCase());
+    if (args.contactEmail) filter.contactEmail = args.contactEmail;
+    if (args.tagNames?.length) filter.tagNames = args.tagNames;
+    if (args.mentionedAgentId) filter.mentionedAgent = args.mentionedAgentId;
+    if (args.draftAuthorId) filter.draftAuthor = args.draftAuthorId;
+    if (args.draftType) filter.draftType = args.draftType.toUpperCase();
+    if (args.rating) filter.rating = args.rating.toUpperCase();
+    if (args.starred !== undefined) filter.starred = args.starred;
+    if (args.deleted !== undefined) filter.deleted = args.deleted;
+    if (args.type?.length) filter.type = args.type.map(type => type.toUpperCase());
+    if (args.updatedAfter) filter.afterUpdatedAt = toDateTime('updatedAfter', args.updatedAfter);
+    if (args.updatedBefore) filter.beforeUpdatedAt = toDateTime('updatedBefore', args.updatedBefore);
     if (args.assignedAgentId) filter.assigned = { agent: args.assignedAgentId };
     if (args.assignedTeamId) filter.assigned = { ...filter.assigned, team: args.assignedTeamId };
     if (args.contactId) filter.contactId = args.contactId;
@@ -567,8 +605,13 @@ export const listConversations = defineTool<ListConversationsArgs>({
     properties: {
       state: {
         type: 'string',
-        enum: ['unread', 'opened', 'closed', 'snoozed'],
-        description: 'Filter by conversation state. opened also includes unread, but leaves out snoozed: ask for snoozed separately to see every ticket that still needs work',
+        enum: ['unread', 'opened', 'closed', 'snoozed', 'spam'],
+        description: 'Filter by conversation state. opened also includes unread, but leaves out snoozed: ask for snoozed separately to see every ticket that still needs work. For tickets in the trash, use deleted',
+      },
+      states: {
+        type: 'array',
+        items: { type: 'string', enum: ['unread', 'opened', 'closed', 'snoozed', 'spam'] },
+        description: 'Tickets in any of these states, for example ["opened", "snoozed"]. Ignored when state is set',
       },
       assignedAgentId: {
         type: 'string',
@@ -581,6 +624,10 @@ export const listConversations = defineTool<ListConversationsArgs>({
       contactId: {
         type: 'string',
         description: 'Filter by contact ID',
+      },
+      contactEmail: {
+        type: 'string',
+        description: 'Only tickets from the contact with this email address',
       },
       channelId: {
         type: 'string',
@@ -595,6 +642,42 @@ export const listConversations = defineTool<ListConversationsArgs>({
         items: { type: 'string' },
         description: 'Filter by tag IDs',
       },
+      tagNames: {
+        type: 'array',
+        items: { type: 'string' },
+        description: 'Tickets with any of these tag names, without looking up their IDs first',
+      },
+      mentionedAgentId: {
+        type: 'string',
+        description: 'Only tickets where this agent was @mentioned in a note',
+      },
+      draftAuthorId: {
+        type: 'string',
+        description: 'Only tickets where this agent has an unsent draft',
+      },
+      draftType: {
+        type: 'string',
+        enum: ['reply', 'reply_all', 'note'],
+        description: 'Only tickets with an unsent draft of this kind',
+      },
+      rating: {
+        type: 'string',
+        enum: ['any', 'awesome', 'ok', 'bad'],
+        description: "Only tickets whose latest customer rating is this; any means rated at all",
+      },
+      starred: {
+        type: 'boolean',
+        description: 'true for starred tickets only, false for tickets without a star',
+      },
+      deleted: {
+        type: 'boolean',
+        description: 'true for tickets in the trash only, false for tickets outside it',
+      },
+      type: {
+        type: 'array',
+        items: { type: 'string', enum: ['email', 'chat', 'widget', 'facebook', 'twitter'] },
+        description: 'Only tickets that came in this way',
+      },
       keywords: {
         type: 'string',
         description: 'Full-text search across conversations',
@@ -606,6 +689,14 @@ export const listConversations = defineTool<ListConversationsArgs>({
       createdBefore: {
         type: 'string',
         description: 'Only tickets created on or before this moment, as an ISO date or date-time. For all of October, use 2026-10-31T23:59:59Z',
+      },
+      updatedAfter: {
+        type: 'string',
+        description: 'Only tickets updated on or after this moment, as an ISO date or date-time',
+      },
+      updatedBefore: {
+        type: 'string',
+        description: 'Only tickets updated on or before this moment, as an ISO date or date-time',
       },
       orderBy: {
         type: 'object',
