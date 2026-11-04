@@ -464,12 +464,6 @@ describe('contacts without a ticket count', () => {
     expect(result.mutations).toEqual([]);
     expect(result.text).toContain('no ticket count');
   });
-
-  test('deleteContacts skips them', async () => {
-    const result = await call({}, 'deleteContacts', { contactIds: ['co_1'], confirm: true });
-    expect(result.mutations).toEqual([]);
-    expect(JSON.parse(result.text).skipped).toBe(1);
-  });
 });
 
 describe('lists that never end', () => {

@@ -147,7 +147,6 @@ const normalPaths = [
   ['updateCompany', { id: 'cp_1', name: 'New name' }, 'CustomFieldValuesUpdate', r => expect(r).toBeTruthy()],
   ['mergeContacts', { source: 'co_2', target: 'co_1' }, 'ContactMerge', r => expect(r).toBeTruthy()],
   ['deleteContact', { email: 'a@example.com', confirm: true }, 'ContactDelete', r => expect(r).toMatchObject({ deleted: true })],
-  ['deleteContacts', { contactIds: ['co_1'], confirm: true }, 'ContactDelete', r => expect(r).toMatchObject({ confirmed: true })],
   ['getContact', { id: 'co_1' }, 'GetContact', r => expect(r.email).toBe('a@example.com')],
   ['getContactProfile', { contactId: 'co_1' }, 'GetCustomProfile', r => expect(r.profile).toBe('Otys\n- Status: Active\n- Recruiter & owner: Kees')],
   ['createContact', { email: 'new@example.com' }, 'ContactCreate', r => expect(r.id).toBe('co_1')],
@@ -210,7 +209,6 @@ describe('a missing required field is refused before Groove is asked', () => {
     ['updateCompany', 'id is required'],
     ['mergeContacts', 'source and target are required'],
     ['deleteContact', 'email is required'],
-    ['deleteContacts', 'contactIds is required'],
     ['getContact', 'id is required'],
     ['createContact', 'email is required'],
     ['updateContact', 'id is required'],
@@ -255,7 +253,7 @@ describe('a tool that is turned off never reaches Groove', () => {
     ...[
       'logConversation', 'updateConversation', 'deleteConversation', 'restoreConversation', 'markAsSpam',
       'editNote', 'reactToNote', 'deleteNote', 'closeConversation', 'createNote', 'createReplyDraft',
-      'deleteDraft', 'updateCompany', 'deleteContact', 'deleteContacts', 'createContact', 'updateContact',
+      'deleteDraft', 'updateCompany', 'deleteContact', 'createContact', 'updateContact',
     ].map(name => [name, { readOnly: true }, 'GROOVE_READ_ONLY is on']),
   ])('%s with %j', async (name, options, reason) => {
     const result = await call(name, byTool[name], { ...ALL_ON, ...options });

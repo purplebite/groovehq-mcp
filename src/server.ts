@@ -81,7 +81,6 @@ const TOOLS: Tool[] = [
   contacts.updateCompany,
   contacts.mergeContacts,
   contacts.deleteContact,
-  contacts.deleteContacts,
   contacts.getContact,
   contacts.getContactProfile,
   contacts.createContact,

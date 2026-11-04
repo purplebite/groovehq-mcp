@@ -13,7 +13,7 @@ const ADDITIVE = [
   'restoreConversation', 'updateConversation',
 ];
 const DESTRUCTIVE = [
-  'createConversation', 'deleteContact', 'deleteContacts', 'deleteConversationPermanently', 'deleteDraft', 'deleteNote',
+  'createConversation', 'deleteContact', 'deleteConversationPermanently', 'deleteDraft', 'deleteNote',
   'editNote', 'forwardConversation', 'markAsSpam', 'mergeContacts', 'mergeConversations', 'sendMessage', 'undoSend',
   'updateCompany', 'updateContact',
 ];

@@ -45,7 +45,7 @@ Both repos use Groove's REST API for conversations. This one runs on GraphQL onl
 - `listContacts`, `getContact`, `createContact`, `updateContact`
 - `getContactProfile`: the extra details your own integration shows next to a contact in Groove, as plain text
 - `mergeContacts`: merge a typo or duplicate contact into the right one. This can't be undone
-- `deleteContact`, `deleteContacts`: delete contacts without tickets, which also removes them from recipient suggestions. This can't be undone
+- `deleteContact`: delete contacts without tickets, which also removes them from recipient suggestions. This can't be undone
 - `listCompanies`, `updateCompany`: find companies, and change a company's name or extra domains
 - `listAgents`, `getAgent`: agents, the teams they're in, and the username to tag them with
 - `listChannels`, `getChannel`
@@ -108,7 +108,7 @@ This server can send real email to real customers. A few things keep that honest
 - **Reading attachments stays within Groove.** `getAttachment` only fetches Groove's own download links (`https://files.groovehq.com/f/download/...`), follows no redirects, and never sends your token. Anyone with such a link can download the file, so treat the links like the files. Text in an attachment comes from whoever sent it, just like an email, and can contain instructions aimed at the model. Set `GROOVE_READ_ATTACHMENTS=0` to leave the tool out.
 - **Spam reaches past one ticket.** Groove blacklists the sender of a ticket marked as spam, so their future mail to any mailbox is marked as spam too. That's why `markAsSpam` is a separate tool marked as destructive. `restoreConversation` brings the ticket back, but the sender stays blacklisted until you remove the address in Groove's settings.
 - **Merging is permanent.** Only the target ticket stays, with its own contact, subject, and assignee. Replies and notes move over, tags are combined, and an open ticket reopens the target. `mergeConversations` is marked as destructive, and it refuses tickets with different contacts or your own drafts on the merged ticket unless told otherwise. Set `GROOVE_ALLOW_MERGE=0` to turn off merging tickets and contacts.
-- **Deleting is limited.** A deleted ticket can always be restored. Deleting one for good takes a separate tool, `deleteConversationPermanently`, which is marked as destructive and only appears when you set `GROOVE_ALLOW_PERMANENT_DELETE=1`. A deleted contact is gone for good, so contacts with tickets can't be deleted at all: merge them first with `mergeContacts`. Other contacts are only deleted with `confirm: true`, at most 100 per call.
+- **Deleting is limited.** A deleted ticket can always be restored. Deleting one for good takes a separate tool, `deleteConversationPermanently`, which is marked as destructive and only appears when you set `GROOVE_ALLOW_PERMANENT_DELETE=1`. A deleted contact is gone for good, so contacts with tickets can't be deleted at all: merge them first with `mergeContacts`. Other contacts are only deleted with `confirm: true`.
 - **Failed updates tell you what happened.** Groove has no all-or-nothing update, so `updateConversation` can succeed halfway. When it does, the error says which steps already went through.
 
 Sending a draft from Groove may close the ticket, depending on your Groove settings.

@@ -82,28 +82,14 @@ interface DeleteContactArgs {
   confirm?: boolean;
 }
 
-interface DeleteContactsArgs {
-  contactIds: string[];
-  confirm?: boolean;
-}
-
-type DeleteOutcome =
-  | { id: string; status: 'would delete' | 'deleted'; email?: string; name?: string }
-  | { id: string; status: 'skipped' | 'failed'; email?: string; reason: string };
-
-const MAX_BULK_DELETE = 100;
 const ORPHAN_PAGE_SIZE = 100;
 const MAX_ORPHAN_PAGES = 5;
-const BULK_DELETE_PAUSE_MS = 100;
-const RATE_LIMIT_RETRIES = 3;
 
 const SENDER_WARNING =
   'Mail this contact wrote in a merged ticket loses its sender when the contact is deleted. Groove cannot show which contacts this affects.';
 
 const EMAIL_PATTERN = /^[^\s,;<>@]+@[^\s,;<>@]+\.[^\s,;<>@]+$/;
 const DOMAIN_PATTERN = /^[a-z0-9-]+(\.[a-z0-9-]+)+$/i;
-
-const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 const CUSTOM_FIELD_KEYS = {
   email: 'contact_email',
@@ -473,65 +459,6 @@ export class ContactTools {
     return { found: true, deleted: true, deletedContact: details };
   }
 
-  async deleteContacts(args: DeleteContactsArgs) {
-    const ids = [...new Set(args.contactIds)];
-    if (!ids.length) throw new Error('Provide at least one contact ID');
-    if (ids.length > MAX_BULK_DELETE) {
-      throw new Error(`Delete at most ${MAX_BULK_DELETE} contacts per call, got ${ids.length}`);
-    }
-
-    const results: DeleteOutcome[] = [];
-    for (const id of ids) {
-      results.push(await this.deleteOne(id, args.confirm === true));
-    }
-
-    const count = (status: DeleteOutcome['status']) =>
-      results.filter(result => result.status === status).length;
-
-    return {
-      confirmed: args.confirm === true,
-      deleted: count('deleted'),
-      skipped: count('skipped'),
-      failed: count('failed'),
-      warning: args.confirm ? undefined : SENDER_WARNING,
-      results,
-    };
-  }
-
-  // Checks each contact right before deleting it, so one that got a ticket in the meantime stays
-  private async deleteOne(id: string, confirm: boolean): Promise<DeleteOutcome> {
-    try {
-      const contact = await this.withRetry(() => this.getContact(id));
-      if (!contact?.id) return { id, status: 'skipped', reason: 'Contact not found' };
-      const { email, name } = contact;
-      if (contact.conversationCount !== 0) {
-        return { id, status: 'skipped', email, reason: this.hasTickets(contact) };
-      }
-      if (!confirm) return { id, status: 'would delete', email, name };
-
-      await this.withRetry(() => this.removeContact(id));
-      await sleep(BULK_DELETE_PAUSE_MS);
-      return { id, status: 'deleted', email, name };
-    } catch (error) {
-      const reason = error instanceof Error ? error.message : String(error);
-      return { id, status: 'failed', reason };
-    }
-  }
-
-  private async withRetry<T>(request: () => Promise<T>): Promise<T> {
-    for (let attempt = 0; ; attempt++) {
-      try {
-        return await request();
-      } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        if (attempt >= RATE_LIMIT_RETRIES || !/429|rate limit|too many requests/i.test(message)) {
-          throw error;
-        }
-        await sleep(1000 * 2 ** attempt);
-      }
-    }
-  }
-
   private async removeContact(contactId: string): Promise<void> {
     await this.client.mutate(mutations.contactDelete, 'contactDelete', { contactId });
   }
@@ -745,33 +672,6 @@ export const deleteContact = defineTool<DeleteContactArgs>({
     required: ['email'],
   },
   handler: (args, { contacts }) => contacts.deleteContact(args),
-});
-
-export const deleteContacts = defineTool<DeleteContactsArgs>({
-  name: 'deleteContacts',
-  setting: 'write',
-  annotations: DESTRUCTIVE_TOOL,
-  description:
-    'Permanently delete up to 100 contacts by ID, one by one. A contact with tickets is skipped. ' +
-    'Without confirm it only shows what would be deleted. Always show that to the user first. ' +
-    'Mail these contacts wrote in merged tickets loses its sender',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      contactIds: {
-        type: 'array',
-        items: { type: 'string' },
-        description: 'Contact IDs to delete, at most 100',
-      },
-      confirm: {
-        type: 'boolean',
-        description: 'Really delete them. Only after the user agreed',
-        default: false,
-      },
-    },
-    required: ['contactIds'],
-  },
-  handler: (args, { contacts }) => contacts.deleteContacts(args),
 });
 
 export const getContactProfile = defineTool<{ contactId: string; channelId?: string; refresh?: boolean }>({
