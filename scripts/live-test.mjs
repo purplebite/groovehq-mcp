@@ -157,7 +157,13 @@ if (ticketsOnly) {
     expect(moved.contact.id === other.id, 'not moved');
     const back = await call('updateConversation', { id, contactId: ticket.contact.id });
     expect(back.contact.id === ticket.contact.id, 'not moved back');
-    await call('deleteContacts', { contactIds: [other.id], confirm: true });
+    // Groove's email lookup and ticket count take a moment to catch up with the move
+    let removed = false;
+    for (let tries = 0; tries < 10 && !removed; tries++) {
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      removed = (await call('deleteContact', { email: other.email, confirm: true }).catch(() => ({}))).deleted === true;
+    }
+    expect(removed, 'test contact not deleted');
   });
 
   await test('spam, delete and restore change the state', async () => {
@@ -437,22 +443,6 @@ if (contactsOnly) {
     const message = await fails('deleteContact', { email: GROOVE_TEST_TO, confirm: true });
     expect(message?.includes('mergeContacts'), 'not refused');
     expect(await exists(GROOVE_TEST_TO), 'deleted');
-  });
-
-  await test('deleteContacts deletes orphans and skips contacts with tickets', async () => {
-    const contact = await create('b');
-    const contactIds = [contact.id, owner.id];
-    const dry = await call('deleteContacts', { contactIds });
-    expect(dry.results[0].status === 'would delete' && dry.results[1].status === 'skipped', 'wrong dry run');
-    expect(await exists(contact.email), 'deleted without confirm');
-    const result = await call('deleteContacts', { contactIds, confirm: true });
-    expect(result.deleted === 1 && result.skipped === 1, 'wrong result');
-    expect((await settles(contact.email, false)) && (await exists(GROOVE_TEST_TO)), 'wrong contacts deleted');
-  });
-
-  await test('deleteContacts refuses more than 100 contacts', async () => {
-    const contactIds = Array.from({ length: 101 }, (_, index) => `co_${index}`);
-    expect(await fails('deleteContacts', { contactIds }), 'not refused');
   });
 
   await test('mergeContacts removes the source and keeps the target', async () => {

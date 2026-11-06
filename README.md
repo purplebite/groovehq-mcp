@@ -115,7 +115,7 @@ Settings take only `1` or `0`. Anything else, like `true`, stops the server, so 
 Groove's API calls tickets *conversations*, mailboxes *channels*, and colleagues *agents*. Tool names follow Groove; this README says ticket, mailbox, and colleague.
 
 <details>
-<summary>All 44 tools</summary>
+<summary>All 46 tools</summary>
 
 **Tickets**
 
