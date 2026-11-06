@@ -96,13 +96,21 @@ const TOOLS: Tool[] = [
   channels.getChannel,
 ];
 
-function checkArgument(key: string, field: PropertySchema, value: unknown): void {
-  if (value === undefined) return;
+// Returns the value as the schema writes it, so CLOSED becomes closed
+function checkArgument(key: string, field: PropertySchema, value: unknown, hints?: Record<string, string>): unknown {
+  if (value === undefined) return value;
   if (field.type === 'boolean') {
     if (typeof value !== 'boolean') throw new Error(`${key} must be true or false`);
-    return;
+    return value;
   }
-  if (value === null) return;
+  if (value === null) return value;
+  const pick = (allowed: unknown[], item: string) => {
+    const match = allowed.find(option => String(option).toLowerCase() === item.toLowerCase());
+    if (match !== undefined) return match;
+    const hint = hints && Object.hasOwn(hints, item.toLowerCase()) ? hints[item.toLowerCase()] : undefined;
+    if (hint) throw new Error(hint);
+    return undefined;
+  };
 
   if (key === 'limit') {
     if (!Number.isInteger(value) || (value as number) < 1) throw new Error('limit must be a whole number of at least 1');
@@ -110,12 +118,38 @@ function checkArgument(key: string, field: PropertySchema, value: unknown): void
     if (typeof value !== 'number' || !Number.isFinite(value)) throw new Error(`${key} must be a number`);
   } else if (field.type === 'string') {
     if (typeof value !== 'string') throw new Error(`${key} must be text`);
+    // A value outside the list would otherwise be skipped or reach Groove, depending on the tool
+    if (Array.isArray(field.enum)) {
+      const match = pick(field.enum, value);
+      if (match === undefined) throw new Error(`${key} must be one of: ${field.enum.join(', ')}`);
+      return match;
+    }
+  } else if (field.type === 'object' && field.properties) {
+    // One level down, for fields like orderBy.field; its own required fields are checked too
+    if (typeof value !== 'object' || Array.isArray(value)) throw new Error(`${key} must be an object`);
+    const nested = value as Record<string, unknown>;
+    for (const name of (field.required as string[] | undefined) ?? []) {
+      if (nested[name] == null || nested[name] === '') throw new Error(`${key}.${name} is required`);
+    }
+    const checked: Record<string, unknown> = { ...nested };
+    for (const [name, sub] of Object.entries(field.properties as Record<string, PropertySchema>)) {
+      const result = checkArgument(`${key}.${name}`, sub, nested[name]);
+      if (result !== undefined) checked[name] = result;
+    }
+    return checked;
   } else if (field.type === 'array') {
     if (!Array.isArray(value)) throw new Error(`${key} must be a list`);
     if (field.items?.type === 'string' && value.some(item => typeof item !== 'string')) {
       throw new Error(`${key} must be a list of text`);
     }
+    const allowed = field.items?.enum;
+    if (allowed) {
+      const matches = value.map(item => pick(allowed, item as string));
+      if (matches.includes(undefined)) throw new Error(`${key} may only contain: ${allowed.join(', ')}`);
+      return matches;
+    }
   }
+  return value;
 }
 
 // Left out, null and empty text all count as missing
@@ -239,7 +273,8 @@ export function createGrooveServer(opts: GrooveServerOptions): Server {
       // The server gets every call as is, so the schema of a tool isn't enforced by anything else
       const schema = tools.find(listed => listed.name === name)?.inputSchema;
       for (const [key, field] of Object.entries(schema?.properties ?? {})) {
-        checkArgument(key, field, args[key]);
+        const checked = checkArgument(key, field, args[key], tool?.hints?.[key]);
+        if (checked !== undefined) args[key] = checked;
       }
 
       // Refused rather than ignored, so a mail never goes out without its file

@@ -106,6 +106,8 @@ export interface ToolDefinition<Args> {
   annotations: { readOnlyHint: boolean; destructiveHint?: boolean };
   description: string;
   inputSchema: InputSchema | ((fields: OptionalFields) => InputSchema);
+  // A clearer error for a known wrong value, per argument; not part of the schema in tools/list
+  hints?: Record<string, Record<string, string>>;
   handler: (args: Args, context: ToolContext) => Promise<unknown>;
 }
 

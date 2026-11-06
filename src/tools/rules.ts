@@ -25,7 +25,6 @@ export class RuleTools {
   constructor(private client: GrooveClient) {}
 
   async listRules(args: { state?: 'active' | 'inactive' } = {}) {
-    if (args.state !== undefined && !['active', 'inactive'].includes(args.state)) throw new Error('state must be active or inactive');
     const filter = args.state ? { state: args.state.toUpperCase() } : undefined;
     const rules: RawRule[] = [];
     let after: string | undefined;

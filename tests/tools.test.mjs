@@ -603,7 +603,7 @@ describe('listMessages from the start and in plain text', () => {
     expect(result.json[0]).toMatchObject({ body: '<p>Text 1</p>', bodyPlainText: 'Text 1' });
   });
 
-  test.each([['from', 'middle', 'from must be start or end'], ['format', 'html', 'format must be full or plain']])(
+  test.each([['from', 'middle', 'from must be one of: start, end'], ['format', 'html', 'format must be one of: full, plain']])(
     'an unknown %s is refused',
     async (key, value, error) => {
       const result = await call('listMessages', { conversationId: '1', [key]: value }, ALL_ON, three);
@@ -694,7 +694,7 @@ describe('rules', () => {
     expect(requests.find(r => r.operation === 'ListRules').variables.filter).toEqual({ state: 'INACTIVE' });
     const result = await call('listRules', { state: 'paused' });
     expect(result.isError).toBe(true);
-    expect(result.json.error).toBe('state must be active or inactive');
+    expect(result.json.error).toBe('state must be one of: active, inactive');
   });
 });
 
@@ -822,4 +822,75 @@ describe('sent reply', () => {
     await call('sendMessage', { conversationId: '1', to: 'a@example.com', body: 'Hi' });
     expect(requests.find(r => r.operation === 'ConversationReply')).toBeDefined();
   });
+});
+
+describe('values outside a list', () => {
+  // Every list of allowed values in every tool, read from tools/list, so a new tool is covered too
+  test('are refused for every tool before Groove is asked', async () => {
+    const [serverSide, clientSide] = InMemoryTransport.createLinkedPair();
+    await createGrooveServer({ token: 'test-token', apiUrl: url, ...ALL_ON, allowSendAs: true, allowAttachments: true }).connect(serverSide);
+    const client = new Client({ name: 'enum-test', version: '1.0.0' });
+    await client.connect(clientSide);
+    const { tools } = await client.listTools();
+    await client.close();
+
+    // Fields inside an object, like orderBy.field, get valid values for the others, so only one is wrong
+    const nested = (key, field) =>
+      Object.entries(field.properties ?? {}).flatMap(([name, sub]) => {
+        if (!Array.isArray(sub.enum)) return [];
+        const valid = Object.fromEntries(Object.entries(field.properties).filter(([, s]) => Array.isArray(s.enum)).map(([n, s]) => [n, s.enum[0]]));
+        return [[{ ...valid, [name]: 'not-a-valid-value' }, `${key}.${name} must be one of: ${sub.enum.join(', ')}`]];
+      });
+    const cases = tools.flatMap(tool =>
+      Object.entries(tool.inputSchema.properties ?? {}).flatMap(([key, field]) => [
+        ...(Array.isArray(field.enum) ? [[tool.name, key, 'not-a-valid-value', `${key} must be one of: ${field.enum.join(', ')}`]] : []),
+        ...(Array.isArray(field.items?.enum) ? [[tool.name, key, ['not-a-valid-value'], `${key} may only contain: ${field.items.enum.join(', ')}`]] : []),
+        ...(field.type === 'object' ? nested(key, field).map(([value, error]) => [tool.name, key, value, error]) : []),
+      ]),
+    );
+    expect(cases.some(([, key]) => key === 'orderBy')).toBe(true);
+    expect(cases.length).toBeGreaterThan(10);
+    for (const [name, key, value, error] of cases) {
+      const result = await call(name, { [key]: value });
+      expect({ name, key, isError: result.isError, error: result.json.error }).toEqual({ name, key, isError: true, error });
+      expect(result.operations).toEqual([]);
+    }
+  });
+
+  test('orderBy needs its field, and takes it in any case', async () => {
+    const missing = await call('listContacts', { orderBy: { direction: 'ASC' } });
+    expect(missing.json.error).toBe('orderBy.field is required');
+    await call('listConversations', { orderBy: { field: 'created_at', direction: 'asc' } });
+    expect(requests.find(r => r.operation === 'ListConversations').variables.orderBy).toEqual({ field: 'CREATED_AT', direction: 'ASC' });
+  });
+
+  test('a value inside the list still works', async () => {
+    const result = await call('updateConversation', { id: '1', state: 'closed' });
+    expect(result.isError).toBe(false);
+  });
+
+  test('a state in capitals is carried out instead of skipped', async () => {
+    const result = await call('updateConversation', { id: '1', state: 'Closed' });
+    expect(result.isError).toBe(false);
+    expect(result.operations).toContain('ConversationClose');
+  });
+
+  test('values in capitals still reach Groove the way the tool expects', async () => {
+    await call('listConversations', { state: 'CLOSED', states: ['OPENED'], type: ['EMAIL'] });
+    expect(requests.find(r => r.operation === 'ListConversations').variables.filter).toEqual({ state: 'CLOSED', states: ['OPENED'], type: ['EMAIL'] });
+  });
+
+  test('a name that only exists inside JavaScript is not taken for a hint', async () => {
+    const result = await call('updateConversation', { id: '1', state: 'constructor' });
+    expect(result.json.error).toBe('state must be one of: opened, closed, snoozed, unread');
+  });
+
+  test.each([['spam', 'Use markAsSpam to mark a ticket as spam'], ['Trashed', 'Use deleteConversation to delete a ticket']])(
+    'updateConversation with state %s points to the right tool',
+    async (state, hint) => {
+      const result = await call('updateConversation', { id: '1', state });
+      expect(result.json.error).toBe(hint);
+      expect(result.operations).toEqual([]);
+    },
+  );
 });

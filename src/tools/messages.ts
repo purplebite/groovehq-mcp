@@ -40,8 +40,6 @@ export class MessageTools {
   constructor(private client: GrooveClient) {}
 
   async listMessages(args: ListMessagesArgs): Promise<Array<Message | Omit<Message, 'body'>>> {
-    if (args.from !== undefined && !['start', 'end'].includes(args.from)) throw new Error('from must be start or end');
-    if (args.format !== undefined && !['full', 'plain'].includes(args.format)) throw new Error('format must be full or plain');
     const conversationId = await this.client.resolveConversationId(args.conversationId);
     const messages: Message[] = [];
     let after: string | undefined;

@@ -302,9 +302,6 @@ export class ConversationTools {
   }
 
   async updateConversation(args: UpdateConversationArgs): Promise<Conversation> {
-    const state = (args.state as string | undefined)?.toLowerCase();
-    if (state === 'spam') throw new Error('Use markAsSpam to mark a ticket as spam');
-    if (state === 'trashed') throw new Error('Use deleteConversation to delete a ticket');
     if (args.removeTagIds?.some(tagId => args.tagIds?.includes(tagId))) {
       throw new Error('A tag cannot be in both tagIds and removeTagIds');
     }
@@ -1000,6 +997,13 @@ export const updateConversation = defineTool<UpdateConversationArgs>({
       },
     },
     required: ['id'],
+  },
+  hints: {
+    state: {
+      spam: 'Use markAsSpam to mark a ticket as spam',
+      trashed: 'Use deleteConversation to delete a ticket',
+      deleted: 'Use deleteConversation to delete a ticket',
+    },
   },
   handler: (args, { conversations }) => conversations.updateConversation(args),
 });
