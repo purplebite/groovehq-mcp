@@ -1,3 +1,4 @@
+import pkg from '../package.json' with { type: 'json' };
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import {
   CallToolRequestSchema,
@@ -226,7 +227,7 @@ export function createGrooveServer(opts: GrooveServerOptions): Server {
   const server = new Server(
     {
       name: 'groovehq-mcp',
-      version: '0.16.1',
+      version: pkg.version,
     },
     {
       capabilities: {

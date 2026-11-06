@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, test } from '@jest/globals';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
@@ -43,5 +44,17 @@ describe('tools/list', () => {
 
     expect(Object.keys(combinations)).toHaveLength(64);
     expect({ definitions, combinations }).toMatchSnapshot();
+  });
+});
+
+describe('server version', () => {
+  test('is the version in package.json', async () => {
+    const pkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
+    const [serverSide, clientSide] = InMemoryTransport.createLinkedPair();
+    await createGrooveServer({ token: 'test' }).connect(serverSide);
+    const client = new Client({ name: 'version-test', version: '1.0.0' });
+    await client.connect(clientSide);
+    expect(client.getServerVersion()).toMatchObject({ name: 'groovehq-mcp', version: pkg.version });
+    await client.close();
   });
 });
