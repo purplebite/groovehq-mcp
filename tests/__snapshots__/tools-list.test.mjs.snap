@@ -3760,7 +3760,7 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
             "type": "string",
           },
           "limit": {
-            "description": "Return only this many messages (default: all), counted from the end unless from is start",
+            "description": "Return only this many messages (default: all), counted from the end unless from is start. The whole ticket is still read, to sort merged messages by date",
             "type": "number",
           },
         },

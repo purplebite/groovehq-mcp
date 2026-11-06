@@ -46,7 +46,9 @@ export class MessageTools {
     let hasNextPage = true;
     const nextPage = pageGuard('messages');
 
-    // Events list every message, unlike event groups, which show one per group
+    // Events list every message, unlike event groups, which show one per group. All pages are read even
+    // with a limit: Groove puts merged messages at the end with their old dates, so only the full list
+    // can be sorted into the right first and last messages
     while (hasNextPage) {
       const response = await this.client.request<{
         events: {
@@ -309,7 +311,7 @@ export const listMessages = defineTool<ListMessagesArgs>({
       },
       limit: {
         type: 'number',
-        description: 'Return only this many messages (default: all), counted from the end unless from is start',
+        description: 'Return only this many messages (default: all), counted from the end unless from is start. The whole ticket is still read, to sort merged messages by date',
       },
       from: {
         type: 'string',
