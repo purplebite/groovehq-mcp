@@ -68,7 +68,7 @@ async function loadDns(): Promise<Dns | undefined> {
 
 async function addressesOf(dns: Dns, hostname: string, value: string): Promise<string[]> {
   try {
-    return (await dns.lookup(hostname, { all: true, verbatim: true })).map(entry => entry.address);
+    return (await dns.lookup(hostname, { all: true })).map(entry => entry.address);
   } catch (error) {
     // Workers have no lookup, but they can ask DNS directly
     if (!/not implemented/i.test(error instanceof Error ? error.message : '')) {
