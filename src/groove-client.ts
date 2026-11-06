@@ -29,6 +29,19 @@ export class GrooveClient {
       return await this.client.request<T>(query, variables);
     } catch (error) {
       const { response } = error as { response?: { errors?: GraphQLError[]; status?: number } };
+      // Before the GraphQL errors, because Groove can send those with a 401 too
+      if (response?.status === 401) {
+        throw new Error('Groove refused the API token (HTTP 401). Check GROOVE_API_TOKEN');
+      }
+      // A 403 can be about one mailbox or ticket, so Groove's own message says more than a token hint
+      if (response?.status === 403) {
+        const detail = response.errors?.[0]?.message;
+        throw new Error(
+          detail
+            ? `Groove refused the request (HTTP 403): ${this.redact(detail)}`
+            : 'Groove refused the request (HTTP 403). Check GROOVE_API_TOKEN and what it may access',
+        );
+      }
       if (response?.errors) {
         const graphqlError = response.errors[0];
         if (graphqlError.extensions?.code === 'RESOURCE_MERGED') {
@@ -94,8 +107,7 @@ export class GrooveClient {
     try {
       await this.request(query);
       return true;
-    } catch (error) {
-      console.error('Failed to validate Groove connection:', error);
+    } catch {
       return false;
     }
   }

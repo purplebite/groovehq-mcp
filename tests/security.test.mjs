@@ -526,6 +526,22 @@ describe('errors', () => {
     expect(result.text).not.toContain('query');
   });
 
+  test.each([
+    [401, 'Groove refused the API token (HTTP 401)'],
+    [403, 'Groove refused the request (HTTP 403): Unauthorized'],
+  ])('HTTP %s is reported as such, also with GraphQL errors in the body', async (status, message) => {
+    call.answer = (query, res) => {
+      res.statusCode = status;
+      res.setHeader('content-type', 'application/json');
+      res.end(JSON.stringify({ errors: [{ message: 'Unauthorized' }] }));
+      return 'handled';
+    };
+    const result = await call({}, 'listTags', {});
+    call.answer = undefined;
+    expect(result.isError).toBe(true);
+    expect(result.text).toContain(message);
+  });
+
   test('a merged ticket says where it went', async () => {
     call.answer = () => ({ errors: [{ message: 'merged', extensions: { code: 'RESOURCE_MERGED', new_conversation_id: 'cnv_42' } }] });
     const result = await call({}, 'getConversation', { id: 'cnv_7' });

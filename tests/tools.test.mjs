@@ -377,6 +377,46 @@ describe('knowledge base', () => {
 });
 
 describe('the stdio server', () => {
+  test('starts even when Groove refuses the token, and says so on the first call', async () => {
+    const refusing = http.createServer((req, res) => {
+      req.resume();
+      req.on('end', () => {
+        res.statusCode = 401;
+        res.end('{"error":"unauthorized"}');
+      });
+    });
+    await new Promise(resolve => refusing.listen(0, '127.0.0.1', resolve));
+    const server = spawn('node', [new URL('../dist/index.js', import.meta.url).pathname], {
+      stdio: ['pipe', 'pipe', 'pipe'],
+      env: { PATH: process.env.PATH, GROOVE_API_TOKEN: 'bad-token', GROOVE_API_URL: `http://127.0.0.1:${refusing.address().port}/graphql` },
+    });
+    let stderr = '';
+    server.stderr.on('data', chunk => (stderr += chunk));
+    const lines = createInterface({ input: server.stdout })[Symbol.asyncIterator]();
+    let id = 1;
+    const rpc = async (method, params) => {
+      server.stdin.write(JSON.stringify({ jsonrpc: '2.0', id: id++, method, params }) + '\n');
+      const { value } = await lines.next();
+      return JSON.parse(value);
+    };
+    try {
+      const init = await rpc('initialize', { protocolVersion: '2024-11-05', capabilities: {}, clientInfo: { name: 'stdio-test', version: '1' } });
+      expect(init.result.serverInfo.name).toBe('groovehq-mcp');
+      const call = await rpc('tools/call', { name: 'listTags', arguments: {} });
+      expect(call.result.isError).toBe(true);
+      expect(call.result.content[0].text).toContain('Groove refused the API token (HTTP 401)');
+      expect(call.result.content[0].text).not.toContain('bad-token');
+      // The check runs alongside the first call, so its warning can come a moment later
+      for (let waited = 0; !stderr.includes('could not reach Groove') && waited < 2000; waited += 50) {
+        await new Promise(resolve => setTimeout(resolve, 50));
+      }
+      expect(stderr).toContain('could not reach Groove with this API token');
+    } finally {
+      server.kill();
+      await new Promise(resolve => refusing.close(resolve));
+    }
+  });
+
   test('refuses an attachment over 20 MB without dropping the connection', async () => {
     const server = spawn('node', [new URL('../dist/index.js', import.meta.url).pathname], {
       stdio: ['pipe', 'pipe', 'ignore'],

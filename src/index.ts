@@ -35,19 +35,17 @@ const server = createGrooveServer({
 const grooveClient = new GrooveClient(apiToken, apiUrl);
 
 async function main() {
-  console.error('Validating Groove API connection...');
-  const isValid = await grooveClient.validateConnection();
-  
-  if (!isValid) {
-    console.error('Failed to connect to Groove API. Please check your API token and URL.');
-    process.exit(1);
-  }
-
   // The SDK closes the connection on a message over 10 MB. An attachment of the
   // allowed 20 MB is about 27 MB as base64, so it gets refused with an error instead
   const transport = new StdioServerTransport(process.stdin, process.stdout, { maxBufferSize: 32 * 1024 * 1024 });
+  // Connected first, so a client with a short startup timeout doesn't give up on a slow Groove.
+  // A bad token then shows in the log here, and in the error of the first tool call
   await server.connect(transport);
   console.error('Groove MCP server started successfully');
+
+  if (!(await grooveClient.validateConnection())) {
+    console.error('Warning: could not reach Groove with this API token. Tool calls will fail until GROOVE_API_TOKEN and GROOVE_API_URL are right.');
+  }
 }
 
 main().catch((error) => {
