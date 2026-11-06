@@ -321,6 +321,12 @@ describe('safety options', () => {
     expect(stderr).toContain(`${name} must be 1 or 0`);
   });
 
+  test('no GROOVE_API_TOKEN stops the server', async () => {
+    const { code, stderr } = await start({ GROOVE_API_TOKEN: '' });
+    expect(code).toBe(1);
+    expect(stderr).toContain('GROOVE_API_TOKEN environment variable is required');
+  });
+
   test.each([['GROOVE_READ_ONLY', '1'], ['GROOVE_ALLOW_MERGE', '0'], ['GROOVE_ALLOW_SEND', '0']])('%s=%s starts', async (name, value) => {
     answer = () => undefined;
     expect((await start({ [name]: value })).stderr).toContain('started successfully');
@@ -518,6 +524,22 @@ describe('errors', () => {
     expect(result.text).not.toContain('customer search');
     expect(result.text).not.toContain('internal detail');
     expect(result.text).not.toContain('query');
+  });
+
+  test('a merged ticket says where it went', async () => {
+    call.answer = () => ({ errors: [{ message: 'merged', extensions: { code: 'RESOURCE_MERGED', new_conversation_id: 'cnv_42' } }] });
+    const result = await call({}, 'getConversation', { id: 'cnv_7' });
+    call.answer = undefined;
+    expect(result.isError).toBe(true);
+    expect(result.text).toContain('Ticket was merged into #42');
+  });
+
+  test('a deleted or unknown ticket is reported as such', async () => {
+    call.answer = () => ({ errors: [{ message: 'An object of type Conversation is deleted' }] });
+    const result = await call({}, 'getConversation', { id: 'cnv_7' });
+    call.answer = undefined;
+    expect(result.isError).toBe(true);
+    expect(result.text).toContain('Ticket not found or deleted');
   });
 
   test('a token that Groove repeats in an error is masked', async () => {
