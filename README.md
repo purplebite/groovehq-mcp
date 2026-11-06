@@ -2,17 +2,124 @@
 
 Talk to your [Groove](https://groovehq.com) inbox from Claude or any other MCP client. Find that one ticket from three weeks ago, read the whole thread, reply, leave a note for a colleague, and close it, all without opening a single tab.
 
-## Why this fork exists
+## What you can do with it
 
-We started this because Claude couldn't find our tickets. The npm package of [christiangenco/groove-mcp](https://github.com/christiangenco/groove-mcp) fails on nearly every lookup, and [ebenpaul/groovehq-mcp](https://github.com/ebenpaul/groovehq-mcp) has no keyword search.
+Ask in plain words, for example:
 
-Both repos use Groove's REST API for conversations. This one runs on GraphQL only, and it's tested against a live account.
+- *"What came in today that still needs an answer?"*
+- *"Summarize ticket #12345, including the PDF the customer attached."*
+- *"Write a draft reply based on our standard answer about refunds, and ask Sam in a note to check it."*
+- *"What did customers ask about most this month, and which questions could a help article answer?"*
+- *"How did the support team handle complaints this month, and what went well?"*
+- *"Why did this ticket get the urgent tag?"*
+
+Claude searches, reads whole threads and their attachments, writes drafts and notes, and keeps tickets tidy: assigning, tagging, closing, and merging duplicates. Sending email is off until you turn it on.
+
+## Installation
+
+You'll need a Groove API token. Grab it here, with your own subdomain filled in:
+
+```
+https://YOUR_SUBDOMAIN.groovehq.com/settings/developer/api
+```
+
+### Claude Code on your computer
+
+You'll need Node.js 22 or newer. Add the server, and restart Claude Code:
+
+```bash
+claude mcp add groovehq-mcp -s user -e GROOVE_API_TOKEN=your_token_here -e GROOVE_READ_ONLY=1 -- npx -y groovehq-mcp
+```
+
+This starts read-only, the safest way to try it. Now ask something like *"what came in today that still needs an answer?"*. That's it.
+
+To have Claude always ask before it sends mail, even in auto mode, add the tools that send to `permissions.ask` in your Claude Code settings:
+
+```json
+{
+  "permissions": {
+    "ask": [
+      "mcp__groovehq-mcp__sendMessage",
+      "mcp__groovehq-mcp__createConversation",
+      "mcp__groovehq-mcp__forwardConversation"
+    ]
+  }
+}
+```
+
+### Claude Code on the web
+
+Cloud sessions start fresh each time, so set Groove up once in a [cloud environment](https://code.claude.com/docs/en/cloud-environments):
+
+1. **Network access:** choose Custom, allow `api.groovehq.com` and `files.groovehq.com`, and keep the default package managers so `npx` can install the package.
+2. **Environment variables:** add `GROOVE_API_TOKEN=your_token_here`. Anyone who uses the environment can read it, so keep the environment to yourself.
+3. **Setup script:** paste this, and put your own instructions where it says so.
+
+```bash
+#!/bin/bash
+set -e
+
+# Groove as an MCP server. GROOVE_API_TOKEN comes from the environment variables.
+# Starts read-only; replace GROOVE_READ_ONLY=1 with GROOVE_ALLOW_SEND=1 to let Claude send mail.
+claude mcp add groovehq-mcp -s user -e GROOVE_READ_ONLY=1 -- npx -y groovehq-mcp@latest
+
+# Always ask before sending mail, also in auto mode
+mkdir -p ~/.claude
+f=~/.claude/settings.json; [ -f "$f" ] || echo '{}' > "$f"
+jq '.permissions.ask = ((.permissions.ask // []) + [
+  "mcp__groovehq-mcp__sendMessage",
+  "mcp__groovehq-mcp__createConversation",
+  "mcp__groovehq-mcp__forwardConversation"
+] | unique)' "$f" > "$f.tmp" && mv "$f.tmp" "$f"
+
+# Instructions for Claude in every session of this environment
+cat >> ~/.claude/CLAUDE.md <<'EOF'
+## Groove
+- "Mailbox" and "tickets" mean Groove, through the groovehq-mcp tools.
+- Never send, reply to, or forward anything unless I ask for it in my latest message. Show me the text and the recipient first.
+- <your own instructions, for example which mailbox to use or which tickets to show by default>
+EOF
+```
+
+New sessions in that environment have Groove ready.
+
+### Other clients
+
+Using a different MCP client? Have it run `npx -y groovehq-mcp` and set `GROOVE_API_TOKEN` in its environment. claude.ai and the Claude apps can't start a server on your computer: they need a hosted one (see [Use as a library](#use-as-a-library)).
+
+> **Heads up:** the package is `groovehq-mcp`, with the `hq`. `groove-mcp` is the [one this fork started from](#why-this-fork).
+
+### Defaults and the token
+
+**What's on without settings.** Without `GROOVE_READ_ONLY=1`, Claude can also change, assign, tag, close, merge, move, and delete tickets, mark them as spam, delete contacts, and save drafts. It can't send email or delete anything for good until you turn that on below.
+
+**About the token.** A token belongs to one Groove agent and can do everything that agent can. Everything Claude does shows up in Groove under that agent's name. For a setup that others share, consider a separate Groove agent for it. On your computer, `claude mcp add` saves the token as plain text in `~/.claude.json`, readable only by your own user account.
+
+### Settings
+
+| Setting | Default | What it does |
+|---|---|---|
+| `GROOVE_READ_ONLY` | `0` | `1` leaves out every tool that writes, including drafts |
+| `GROOVE_ALLOW_SEND` | `0` | `1` adds the tools that send mail: `sendMessage`, `createConversation`, `forwardConversation` and `undoSend` |
+| `GROOVE_ALLOW_SEND_AS` | `0` | `1` lets mail and notes go out as a colleague, with `authorId` |
+| `GROOVE_ALLOW_MERGE` | `1` | `0` turns off merging tickets and contacts |
+| `GROOVE_ALLOW_PERMANENT_DELETE` | `0` | `1` adds `deleteConversationPermanently` |
+| `GROOVE_ALLOW_ATTACHMENTS` | `0` | `1` lets mail and notes carry files, from a link or as base64 |
+| `GROOVE_READ_ATTACHMENTS` | `1` | `0` leaves out `getAttachment` |
+| `GROOVE_API_URL` | Groove's own | Only for a different Groove API address |
+
+Settings take only `1` or `0`. Anything else, like `true`, stops the server, so a typo can't leave a safety setting off. Read-only always wins over the settings that write.
 
 ## What you get
 
+Groove's API calls tickets *conversations*, mailboxes *channels*, and colleagues *agents*. Tool names follow Groove; this README says ticket, mailbox, and colleague.
+
+<details>
+<summary>All 44 tools</summary>
+
 **Tickets**
 
-- `listConversations`: search and filter by keyword, state, agent, team, contact or their email address, channel, tag, Smart Folder, @mention, draft, rating, star, trash, how the ticket came in, or creation and update date, and sort by date. It also gives the total number of matching tickets, so a count takes one call
+- `listConversations`: search and filter tickets on almost anything Groove can filter on, such as keyword, state, agent, team, contact, tag, Smart Folder, or date, sort them, and get the total in one call
 - `getConversation`: get one ticket
 - `listLinkedResources`, `linkResource`: see and add links from a ticket to items in other systems, such as Jira issues
 - `createConversation`: start a new ticket by sending an email, in a chosen `state`
@@ -28,14 +135,14 @@ Both repos use Groove's REST API for conversations. This one runs on GraphQL onl
 **Messages**
 
 - `listMessages`: every message and note on a ticket, oldest first. Ask for only the first or last few, and for plain text without the HTML
-- `getAttachment`: read an attachment from `listMessages`, up to 10 MB. PDF, Word, Excel and PowerPoint files come back as text, images as images, and a zip as a list of its files. Groove's robots.txt blocks automated access to its file links, so clients like Claude can't open them themselves
+- `getAttachment`: read an attachment from `listMessages`, up to 10 MB. PDF, Word, Excel and PowerPoint files come back as text, images as images, and a zip as a list of its files
 - `getRawEmail`: the original email behind a message, with all its headers, to check where a mail really came from
 - `sendMessage`: send an email reply
 - `undoSend`: cancel a mail right after sending it
 - `moveMessageToNewTicket`: take one message out of a ticket and make it a new ticket
 - `createNote`: leave an internal note, and tag colleagues with `mentionAgentIds` so they get a notification
 - `editNote`, `reactToNote`, `deleteNote`: change, react to, or remove an internal note
-- Attach files to mail, notes, and logged tickets with `attachments`, from a public `https` link or as base64. Off by default
+- Attach files to mail, notes, and logged tickets with `attachments`, from a public `https` link or as base64. At most 25 per message, up to 20 MB each. Base64 goes through the model, so it suits small files. Off by default
 - `createReplyDraft`: save a reply or note as a draft for someone to review. It never sends
 - `listCannedReplies`: the team's saved replies, to reuse their wording in a reply or draft
 - `listDrafts`, `deleteDraft`: see and remove your own drafts
@@ -45,9 +152,9 @@ Both repos use Groove's REST API for conversations. This one runs on GraphQL onl
 - `listContacts`, `getContact`, `createContact`, `updateContact`
 - `getContactProfile`: the extra details your own integration shows next to a contact in Groove, as plain text
 - `mergeContacts`: merge a typo or duplicate contact into the right one. This can't be undone
-- `deleteContact`: delete contacts without tickets, which also removes them from recipient suggestions. This can't be undone
+- `deleteContact`: delete a contact without tickets, which also removes it from recipient suggestions. This can't be undone
 - `listCompanies`, `updateCompany`: find companies, and change a company's name or extra domains
-- `listAgents`, `getAgent`: agents, the teams they're in, and the username to tag them with
+- `listAgents`, `getAgent`: colleagues, the teams they're in, and the username to tag them with
 - `listChannels`, `getChannel`
 - `listFolders`: see the Smart Folders you can use in `listConversations`
 - `listRules`: read Groove's automatic rules, to see why a ticket got a tag, an assignee, or a status
@@ -56,29 +163,9 @@ Both repos use Groove's REST API for conversations. This one runs on GraphQL onl
 
 Published knowledge base articles also show up as MCP resources.
 
+</details>
+
 Tickets go by their number, just like in Groove. `12345`, `#12345`, and `cnv_12345` all work.
-
-## Installation
-
-You'll need Node.js 22 or newer and a Groove API token. Grab your token here, with your own subdomain filled in:
-
-```
-https://YOUR_SUBDOMAIN.groovehq.com/settings/developer/api
-```
-
-Then add it to Claude Code:
-
-```bash
-claude mcp add groovehq-mcp -s user -e GROOVE_API_TOKEN=your_token_here -- npx -y groovehq-mcp
-```
-
-To let Claude send email, add `-e GROOVE_ALLOW_SEND=1`. Without it, Claude can still save drafts.
-
-Restart Claude Code, then ask it something like *"show me the open tickets about invoices"*. That's it.
-
-Using a different MCP client? Have it run `npx -y groovehq-mcp` and set `GROOVE_API_TOKEN` in its environment.
-
-> **Heads up:** the package is `groovehq-mcp`, with the `hq`. `groove-mcp` doesn't work.
 
 ## Use as a library
 
@@ -90,26 +177,23 @@ import { createGrooveServer } from 'groovehq-mcp/server';
 const server = createGrooveServer({ token: 'your_token_here', readOnly: true });
 ```
 
-`allowSend`, `allowSendAs`, `allowMerge`, `allowPermanentDelete`, `allowAttachments`, `readAttachments`, and `apiUrl` are optional too. Sending, acting as a colleague, permanent deletion, and attachments stay off unless you set them to `true`, merging and reading attachments stay on unless you set `allowMerge: false` or `readAttachments: false`, and `readOnly` always wins over the options that write. These options must be real booleans: anything else, like the string `'true'`, throws an error.
+The other options are the settings above, as booleans: `readOnly`, `allowSend`, `allowSendAs`, `allowMerge`, `allowPermanentDelete`, `allowAttachments` and `readAttachments`, plus `apiUrl`. They have the same defaults, so without options the tools that write, merge and delete are there. Options must be real booleans: anything else, like the string `'true'`, throws an error.
 
-The library doesn't read the `GROOVE_` settings, so pass each option yourself. It also has no login, so a hosted server has two options: keep one token on the server and put your own authentication in front of it, or have each user send their own Groove API key and pass that to `createGrooveServer`.
+The library doesn't read the `GROOVE_` settings, so pass each option yourself. It also has no login, so a hosted server has two options: keep one token on the server and put your own authentication in front of it, or have each user send their own Groove API token and pass that to `createGrooveServer`.
 
 ## Handle with care
 
-This server can send real email to real customers. A few things keep that honest:
+This server can send real email to real customers. A few things limit what can go wrong:
 
-- **Sending is off by default.** `sendMessage`, `createConversation`, `forwardConversation`, and `undoSend` only appear when you set `GROOVE_ALLOW_SEND=1`.
-- **Read-only mode.** Set `GROOVE_READ_ONLY=1` to leave out every tool that writes, including drafts.
-- **Settings are strict.** The `GROOVE_` settings take only `1` or `0`. Anything else, like `true`, stops the server at startup, so a typo can't leave a safety setting off.
-- **Recipients are always explicit.** `createConversation` and `sendMessage` require a `to` address, nothing is sent to a default, and `cc` and `bcc` are optional.
-- **Acting as a colleague is off by default.** Mail and notes go out as the agent who owns the API token. Set `GROOVE_ALLOW_SEND_AS=1` to pass `authorId` to `createConversation`, `sendMessage`, `createNote`, or `logConversation`. The server first checks that this agent exists and is active, because Groove can otherwise use the token owner without saying so.
-- **Attachments are off by default.** Set `GROOVE_ALLOW_ATTACHMENTS=1` to attach files from a link or as base64, up to 20 MB each and at most 25 per message. Base64 goes through the model, so it suits small files, and one message can carry about 30 MB of it.
-- **Links carry a risk.** The server fetches links itself, so a model misled by a customer email could put ticket data in a link and send it to an outside server. Links must use `https`, and local or private addresses are refused. The server also looks up where a name points, including after a redirect, and refuses it if any of its addresses is private. The download looks the name up again, so a name that changes in between (DNS rebinding) can still get through. Where Node's `dns` module is missing, only the address itself is checked.
-- **Reading attachments stays within Groove.** `getAttachment` only fetches Groove's own download links (`https://files.groovehq.com/f/download/...`), follows no redirects, and never sends your token. Anyone with such a link can download the file, so treat the links like the files. Text in an attachment comes from whoever sent it, just like an email, and can contain instructions aimed at the model. Set `GROOVE_READ_ATTACHMENTS=0` to leave the tool out.
-- **Spam reaches past one ticket.** Groove blacklists the sender of a ticket marked as spam, so their future mail to any mailbox is marked as spam too. That's why `markAsSpam` is a separate tool marked as destructive. `restoreConversation` brings the ticket back, but the sender stays blacklisted until you remove the address in Groove's settings.
-- **Merging is permanent.** Only the target ticket stays, with its own contact, subject, and assignee. Replies and notes move over, tags are combined, and an open ticket reopens the target. `mergeConversations` is marked as destructive, and it refuses tickets with different contacts or your own drafts on the merged ticket unless told otherwise. Set `GROOVE_ALLOW_MERGE=0` to turn off merging tickets and contacts.
-- **Deleting is limited.** A deleted ticket can always be restored. Deleting one for good takes a separate tool, `deleteConversationPermanently`, which is marked as destructive and only appears when you set `GROOVE_ALLOW_PERMANENT_DELETE=1`. A deleted contact is gone for good, so contacts with tickets can't be deleted at all: merge them first with `mergeContacts`. Other contacts are only deleted with `confirm: true`.
-- **Failed updates tell you what happened.** Groove has no all-or-nothing update, so `updateConversation` can succeed halfway. When it does, the error says which steps already went through.
+- **Recipients are always explicit.** Mail only goes to the `to`, `cc` and `bcc` you give. Nothing goes to a default.
+- **Acting as a colleague is checked.** With `authorId`, the server first checks that the colleague exists and is active, because Groove would otherwise quietly use the token's owner.
+- **Links carry a risk.** With attachments on, the server fetches links itself, so a model misled by a customer email could put ticket data in a link to an outside server. Only `https` links are fetched, and the server refuses a name that points to a private address, also after a redirect. The download looks the name up again, so a name that changes in between (DNS rebinding) can still get through. Where Node's `dns` module is missing, as in a Cloudflare Worker, only the address itself is checked.
+- **Attachments can contain instructions.** Text in a file comes from whoever sent it, just like an email. `getAttachment` only reads Groove's own download links and never sends your token. Anyone with such a link can download the file, so treat the links like the files.
+- **Spam reaches past one ticket.** Groove blacklists the sender, so their future mail to any mailbox is spam too, until you remove the address in Groove's settings. That's why `markAsSpam` is a separate tool marked as destructive, so your client can ask first.
+- **Merging is permanent.** Only the target ticket stays. `mergeConversations` refuses tickets with different contacts unless told otherwise.
+- **Deleting is limited.** A deleted ticket can always be restored, and deleting one for good needs its own setting. A deleted contact is gone for good, so contacts with tickets can't be deleted at all: merge them first. Other contacts are only deleted with `confirm: true`.
+- **Moves keep access.** `updateConversation` won't move a ticket to a mailbox your token can't reach, because you couldn't read it or move it back. The model may only override this after asking you.
+- **Updates can stop halfway.** Groove has no all-or-nothing update. If `updateConversation` fails partway, the error says which steps already went through.
 
 Sending a draft from Groove may close the ticket, depending on your Groove settings.
 
@@ -118,15 +202,16 @@ Your MCP client will usually ask before a tool runs. Every tool is labeled as re
 ## Good to know
 
 - **The docs don't cover everything.** Everything here uses Groove's documented GraphQL API, but details like the draft format and what a merge keeps come from testing on a live account.
-- **Live chat isn't supported.** Groove keeps chats apart from tickets, and its API gives no access to their messages. Messages from the widget's contact form are normal tickets and work. Tested with email, the widget's contact form and the knowledge base.
-- **Drafts are personal.** They belong to the agent who owns the API token, and they only work on existing tickets.
-- **Merged messages don't get sorted.** Groove adds them to the end of the ticket with their original dates, while `listMessages` always sorts by date.
-- **0 tickets doesn't always mean unused.** A contact's mail can sit in someone else's ticket after a merge. If you delete that contact, the mail stays but no longer shows who wrote it, and there's no practical way to check beforehand which contacts this affects.
-- **Orphans come in batches.** `listContacts` with `orphansOnly` reads at most 500 contacts per call. Call it again for more, but Groove's list isn't strictly sorted and can repeat contacts, so there's no guarantee you've seen them all.
+- **Live chat isn't supported.** Groove's API gives no access to chat messages. Messages from the widget's contact form are normal tickets and work.
+- **Drafts are personal.** They belong to the agent who owns the API token, and only work on existing tickets.
+- **Smart Folders follow the token.** You see the folders that the token's agent can open, so personal ones like Mine are that agent's.
+- **Deleted and moved messages can still show up.** Groove can return deleted notes, mail moved to another ticket, and undone mail as an empty message.
 - **Companies come from mail domains.** Groove creates them by itself, often without a name, and a contact can have several. `updateContact` adds or removes one and keeps the others, and it also manages extra email addresses.
-- **Smart Folders follow the token.** `listFolders` shows the active Smart Folders that the agent who owns the API token can open, in sidebar order, so personal ones like Mine belong to that agent. Names can repeat, so each folder also lists its teams, mailboxes, and the team it filters on. Names with only punctuation, like `-`, are left out.
-- **Mailbox moves check access.** Groove lets you move a ticket to a mailbox your account can't reach, but afterwards you can't read it or move it back. `updateConversation` refuses such a move unless you pass `allowNoAccess`, which a model should only do after asking.
-- **`listMessages` can show too much.** Groove can still return deleted notes, mail moved to another ticket, and undone mail as an empty message.
+- **0 tickets doesn't always mean unused.** A contact's mail can sit in someone else's ticket after a merge. Deleting that contact leaves the mail without its sender, and there's no practical way to check this beforehand.
+
+## Why this fork
+
+This fork started because Claude couldn't find tickets. With the [christiangenco/groove-mcp](https://github.com/christiangenco/groove-mcp) package, most lookups failed, and [ebenpaul/groovehq-mcp](https://github.com/ebenpaul/groovehq-mcp) had no keyword search. Both use Groove's older REST API for tickets. This one is rebuilt on Groove's GraphQL API, and every release is tested against a live account.
 
 ## Development
 
@@ -146,47 +231,22 @@ The code is small and easy to find your way around: each tool is defined in `src
 
 ## Testing
 
-`scripts/live-test.mjs` runs the real server against a real account and checks every read tool. It changes nothing and prints only counts and ticket numbers:
+`scripts/live-test.mjs` runs the real server against a real account. Without a flag it checks every read tool, changes nothing, and prints only counts and ticket numbers:
 
 ```bash
 GROOVE_API_TOKEN=your_token_here npm run test:live
 ```
 
-To test the tools that write, add `--write`. It asks first, then sends 2 real mails to `GROOVE_TEST_TO` and creates one ticket that it closes again:
+Add a flag to test tools that write. These change real data, so use a test mailbox and an address you own. `--write`, `--merge` and `--tickets` ask first; the others start right away.
 
-```bash
-GROOVE_API_TOKEN=your_token_here GROOVE_TEST_TO=you@example.com GROOVE_TEST_CHANNEL=ch_123 npm run test:live -- --write
-```
-
-To test drafts, add `--drafts` and set `GROOVE_TEST_TICKET` to a ticket you own. It saves and deletes test drafts and sends nothing:
-
-```bash
-GROOVE_API_TOKEN=your_token_here GROOVE_TEST_TICKET=12345 npm run test:live -- --drafts
-```
-
-To test changes to a ticket, add `--update`. It finds a ticket whose subject starts with `[TEST]`, changes its tags and assignee, and puts them back. If you don't have one yet, run `--write` once:
-
-```bash
-GROOVE_API_TOKEN=your_token_here npm run test:live -- --update
-```
-
-To test merging, add `--merge`. It asks first, then sends 3 real mails to `GROOVE_TEST_TO` and a plus address of it, and merges those tickets into one that it closes again:
-
-```bash
-GROOVE_API_TOKEN=your_token_here GROOVE_TEST_TO=you@example.com GROOVE_TEST_CHANNEL=ch_123 npm run test:live -- --merge
-```
-
-To test contacts, add `--contacts` and set `GROOVE_TEST_TO` to an address that has tickets. It creates and deletes contacts on plus addresses of it and sends nothing:
-
-```bash
-GROOVE_API_TOKEN=your_token_here GROOVE_TEST_TO=you@example.com npm run test:live -- --contacts
-```
-
-To test ticket changes and attachments, add `--tickets`. It asks first, then sends 8 test mails to plus addresses of `GROOVE_TEST_TO`, two of them as a random active agent, and changes and deletes test tickets:
-
-```bash
-GROOVE_API_TOKEN=your_token_here GROOVE_TEST_TO=you@example.com GROOVE_TEST_CHANNEL=ch_123 npm run test:live -- --tickets
-```
+| Flag | What it does | Also needs |
+|---|---|---|
+| `--write` | sends 2 test mails, creates one ticket and closes it again | `GROOVE_TEST_TO`, `GROOVE_TEST_CHANNEL` |
+| `--drafts` | saves and deletes test drafts, sends nothing | `GROOVE_TEST_TICKET`, a ticket you own |
+| `--update` | changes a ticket whose subject starts with `[TEST]`, and puts it back | – |
+| `--merge` | sends 3 test mails and merges those tickets | `GROOVE_TEST_TO`, `GROOVE_TEST_CHANNEL` |
+| `--contacts` | creates and deletes test contacts, and checks that a contact with tickets can't be deleted. Sends nothing | `GROOVE_TEST_TO`, an address that already has tickets |
+| `--tickets` | sends 8 test mails, two of them in the name of a random active colleague, and changes and deletes test tickets | `GROOVE_TEST_TO`, `GROOVE_TEST_CHANNEL` |
 
 ## License
 
