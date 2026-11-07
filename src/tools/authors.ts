@@ -92,8 +92,9 @@ function toTime(key: string, value: string): number {
   return time;
 }
 
-// Groove's own errors come as GraphQL errors; anything else means the request itself failed
-const isGraphqlError = (error: unknown) => error instanceof Error && error.message.startsWith('GraphQL Error');
+// Groove's own answers about a ticket come as GraphQL errors, some reworded by the client; anything else means the request itself failed
+const GROOVE_SAID = ['GraphQL Error', 'Ticket was merged into', 'Ticket not found or deleted', 'Groove refused the request (HTTP 403)'];
+const isGraphqlError = (error: unknown) => error instanceof Error && GROOVE_SAID.some(start => error.message.startsWith(start));
 
 export class AuthorTools {
   private conversations: ConversationTools;
@@ -127,12 +128,18 @@ export class AuthorTools {
 
     // All matching tickets, 50 per page
     const tickets: Conversation[] = [];
+    const listed = new Set<string>();
     const nextPage = pageGuard('tickets');
     let cursor: string | undefined;
     while (tickets.length < matched) {
       requests++;
       const page = await this.conversations.listConversations({ ...filters, limit: TICKETS_PER_PAGE, after: cursor });
-      tickets.push(...page.conversations);
+      // A ticket updated during the read can shift to a later page and come by twice
+      for (const ticket of page.conversations) {
+        if (!listed.has(ticket.id)) tickets.push(ticket);
+        listed.add(ticket.id);
+      }
+      if (!page.conversations.length) break;
       if (!page.pageInfo.hasNextPage) break;
       cursor = nextPage(page.pageInfo.endCursor ?? null);
     }
@@ -190,17 +197,15 @@ export class AuthorTools {
     // One request per 40 tickets. When Groove refuses a batch, it is split, so one broken ticket is reported
     // and not the whole batch. A failed request (network, 5xx, token) stops the whole call instead
     const read = async (batch: Conversation[]): Promise<void> => {
+      // Nothing is counted until every ticket of the batch is in, so a retry after a failure counts nothing twice
+      const messages: Array<[Conversation, MessageNode[] | null]> = [];
       try {
         const variables = Object.fromEntries(batch.map((ticket, index) => [`c${index}`, ticket.id]));
         requests++;
         const response = await this.client.request<Record<string, EventsPage | null>>(batchQuery(batch.length), variables);
         for (const [index, ticket] of batch.entries()) {
           const page = response[`e${index}`];
-          if (!page) {
-            failed.push(ticket.number);
-            continue;
-          }
-          tally(ticket, page.pageInfo.hasNextPage ? await restOf(ticket, page) : page.nodes);
+          messages.push([ticket, page ? (page.pageInfo.hasNextPage ? await restOf(ticket, page) : page.nodes) : null]);
         }
       } catch (error) {
         if (!isGraphqlError(error)) throw error;
@@ -211,6 +216,10 @@ export class AuthorTools {
         const half = Math.ceil(batch.length / 2);
         await read(batch.slice(0, half));
         await read(batch.slice(half));
+        return;
+      }
+      for (const [ticket, nodes] of messages) {
+        if (nodes) tally(ticket, nodes); else failed.push(ticket.number);
       }
     };
 

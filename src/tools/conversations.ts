@@ -478,7 +478,7 @@ export class ConversationTools {
   // What the user needs to recognise a ticket before a change that asks first
   private async ticketPreview(id: string) {
     const ticket = await this.getConversation(id);
-    if (!ticket) throw new Error(`Ticket not found: ${id}`);
+    if (!ticket?.id) throw new Error(`Ticket not found: ${id}`);
     return { id: ticket.id, number: ticket.number, subject: ticket.subject, contact: ticket.contact?.email ?? null, state: ticket.state };
   }
 

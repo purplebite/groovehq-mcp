@@ -997,6 +997,40 @@ describe('listConversationAuthors', () => {
     expect(batches).toBe(1);
   });
 
+  test('a failure on an extra page counts nothing twice', async () => {
+    let pages = 0;
+    const answer = (query, variables) => {
+      if (query.includes('ListConversations')) return twoTickets(query);
+      if (query.includes('ListAuthorsPage')) return ++pages === 1 ? { errors: [{ message: 'broken history item' }] } : { data: { events: { nodes: [], pageInfo: page } } };
+      if (query.includes('ListAuthors')) {
+        const reply = { change: { id: 'msg_a', isNote: false, createdAt: '2020-01-02T00:00:00Z', author: { id: 'ag_1', name: 'Agent' } } };
+        return { data: { e0: { nodes: [reply], pageInfo: page }, e1: { nodes: [reply], pageInfo: { hasNextPage: true, endCursor: 'c1' } } } };
+      }
+      return undefined;
+    };
+    const result = await call('listConversationAuthors', {}, ALL_ON, answer);
+    expect(result.json.agents).toEqual([expect.objectContaining({ id: 'ag_1', tickets: 2, replies: 2 })]);
+    expect(result.json.failed).toBeUndefined();
+  });
+
+  test('a ticket merged or deleted during the scan is reported, not fatal', async () => {
+    const answer = (query, variables) => {
+      if (query.includes('ListConversations')) return twoTickets(query);
+      if (query.includes('ListAuthors') && Object.values(variables).includes('cnv_2')) return { errors: [{ message: 'object of type Conversation is deleted' }] };
+      return undefined;
+    };
+    const result = await call('listConversationAuthors', {}, ALL_ON, answer);
+    expect(result.json).toMatchObject({ read: 2, failed: [2] });
+  });
+
+  test('a ticket that comes by twice is counted once', async () => {
+    const twice = query => query.includes('ListConversations')
+      ? { data: { conversations: { nodes: [ticket, ticket], pageInfo: page, totalCount: 2, totalCountCapped: false } } }
+      : undefined;
+    const result = await call('listConversationAuthors', {}, ALL_ON, twice);
+    expect(result.json).toMatchObject({ matched: 2, read: 1 });
+  });
+
   test('writtenBefore is a date before which, so a whole month ends on the first of the next', async () => {
     const result = await call('listConversationAuthors', { writtenBefore: '2020-01-03' }, ALL_ON, twoTickets);
     expect(result.json.agents.map(a => a.id)).toEqual(['ag_1']);
