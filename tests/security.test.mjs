@@ -795,7 +795,9 @@ describe('tools that only run with confirm', () => {
       expect(tools.find(tool => tool.name === name).inputSchema.properties.confirm).toMatchObject({ type: 'boolean' });
     }
     expect(tools.find(tool => tool.name === 'closeConversation').inputSchema.properties.confirm).toBeUndefined();
-    expect(tools.find(tool => tool.name === 'sendMessage').inputSchema.properties.confirm.description).toContain('more than 5 people');
+    const sending = tools.find(tool => tool.name === 'sendMessage').inputSchema.properties.confirm.description;
+    expect(sending).toContain('more than 5 people');
+    expect(sending).not.toContain('does nothing');
     await client.close();
   });
 });

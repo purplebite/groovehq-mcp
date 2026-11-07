@@ -93,7 +93,7 @@ function toTime(key: string, value: string): number {
 }
 
 // Groove's own answers about a ticket come as GraphQL errors, some reworded by the client; anything else means the request itself failed
-const GROOVE_SAID = ['GraphQL Error', 'Ticket was merged into', 'Ticket not found or deleted', 'Groove refused the request (HTTP 403)'];
+const GROOVE_SAID = ['GraphQL Error', 'Ticket was merged into', 'Ticket not found or deleted'];
 const isGraphqlError = (error: unknown) => error instanceof Error && GROOVE_SAID.some(start => error.message.startsWith(start));
 
 export class AuthorTools {

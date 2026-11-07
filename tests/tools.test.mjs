@@ -1023,6 +1023,17 @@ describe('listConversationAuthors', () => {
     expect(result.json).toMatchObject({ read: 2, failed: [2] });
   });
 
+  test('a refused token stops the scan instead of failing every ticket', async () => {
+    const answer = (query, variables, res) => {
+      if (query.includes('ListConversations')) return twoTickets(query);
+      if (query.includes('ListAuthors')) { res.statusCode = 403; res.setHeader('content-type', 'application/json'); res.end(JSON.stringify({ errors: [{ message: 'forbidden' }] })); return 'handled'; }
+      return undefined;
+    };
+    const result = await call('listConversationAuthors', {}, ALL_ON, answer);
+    expect(result.json.error).toContain('HTTP 403');
+    expect(result.json.failed).toBeUndefined();
+  });
+
   test('a ticket that comes by twice is counted once', async () => {
     const twice = query => query.includes('ListConversations')
       ? { data: { conversations: { nodes: [ticket, ticket], pageInfo: page, totalCount: 2, totalCountCapped: false } } }

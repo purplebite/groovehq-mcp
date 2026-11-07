@@ -2325,7 +2325,7 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
           },
           "confirm": {
             "default": false,
-            "description": "Really send this mail to more than 5 people. Without it the tool does nothing but say what would happen. Pass true only after the user agreed",
+            "description": "Really send this mail to more than 5 people. Pass true only after the user agreed",
             "type": "boolean",
           },
           "snoozedUntil": {
@@ -2416,7 +2416,7 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
           },
           "confirm": {
             "default": false,
-            "description": "Really send this mail to more than 5 people. Without it the tool does nothing but say what would happen. Pass true only after the user agreed",
+            "description": "Really send this mail to more than 5 people. Pass true only after the user agreed",
             "type": "boolean",
           },
           "snoozedUntil": {
@@ -2531,7 +2531,7 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
           },
           "confirm": {
             "default": false,
-            "description": "Really send this mail to more than 5 people. Without it the tool does nothing but say what would happen. Pass true only after the user agreed",
+            "description": "Really send this mail to more than 5 people. Pass true only after the user agreed",
             "type": "boolean",
           },
           "snoozedUntil": {
@@ -2650,7 +2650,7 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
           },
           "confirm": {
             "default": false,
-            "description": "Really send this mail to more than 5 people. Without it the tool does nothing but say what would happen. Pass true only after the user agreed",
+            "description": "Really send this mail to more than 5 people. Pass true only after the user agreed",
             "type": "boolean",
           },
           "snoozedUntil": {
@@ -2978,7 +2978,7 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
         "properties": {
           "confirm": {
             "default": false,
-            "description": "Really delete this ticket. Without it the tool does nothing but say what would happen. Pass true only after the user agreed",
+            "description": "Really delete this ticket. Pass true only after the user agreed",
             "type": "boolean",
           },
           "id": {
@@ -3003,7 +3003,7 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
         "properties": {
           "confirm": {
             "default": false,
-            "description": "Really delete this ticket for good. Without it the tool does nothing but say what would happen. Pass true only after the user agreed",
+            "description": "Really delete this ticket for good. Pass true only after the user agreed",
             "type": "boolean",
           },
           "id": {
@@ -3053,7 +3053,7 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
         "properties": {
           "confirm": {
             "default": false,
-            "description": "Really delete this note. Without it the tool does nothing but say what would happen. Pass true only after the user agreed",
+            "description": "Really delete this note. Pass true only after the user agreed",
             "type": "boolean",
           },
           "messageId": {
@@ -3121,7 +3121,7 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
           },
           "confirm": {
             "default": false,
-            "description": "Really send this mail to more than 5 people. Without it the tool does nothing but say what would happen. Pass true only after the user agreed",
+            "description": "Really send this mail to more than 5 people. Pass true only after the user agreed",
             "type": "boolean",
           },
           "conversationId": {
@@ -3205,7 +3205,7 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
           },
           "confirm": {
             "default": false,
-            "description": "Really send this mail to more than 5 people. Without it the tool does nothing but say what would happen. Pass true only after the user agreed",
+            "description": "Really send this mail to more than 5 people. Pass true only after the user agreed",
             "type": "boolean",
           },
           "conversationId": {
@@ -4423,7 +4423,7 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
         "properties": {
           "confirm": {
             "default": false,
-            "description": "Really mark this ticket as spam and blacklist its sender. Without it the tool does nothing but say what would happen. Pass true only after the user agreed",
+            "description": "Really mark this ticket as spam and blacklist its sender. Pass true only after the user agreed",
             "type": "boolean",
           },
           "id": {
@@ -4448,7 +4448,7 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
         "properties": {
           "confirm": {
             "default": false,
-            "description": "Really merge these contacts. Without it the tool does nothing but say what would happen. Pass true only after the user agreed",
+            "description": "Really merge these contacts. Pass true only after the user agreed",
             "type": "boolean",
           },
           "source": {
@@ -4482,7 +4482,7 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
           },
           "confirm": {
             "default": false,
-            "description": "Really merge these tickets. Without it the tool does nothing but say what would happen. Pass true only after the user agreed",
+            "description": "Really merge these tickets. Pass true only after the user agreed",
             "type": "boolean",
           },
           "discardDrafts": {
@@ -4627,7 +4627,7 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
           },
           "confirm": {
             "default": false,
-            "description": "Really send this mail to more than 5 people. Without it the tool does nothing but say what would happen. Pass true only after the user agreed",
+            "description": "Really send this mail to more than 5 people. Pass true only after the user agreed",
             "type": "boolean",
           },
           "conversationId": {
@@ -4680,7 +4680,7 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
           },
           "confirm": {
             "default": false,
-            "description": "Really send this mail to more than 5 people. Without it the tool does nothing but say what would happen. Pass true only after the user agreed",
+            "description": "Really send this mail to more than 5 people. Pass true only after the user agreed",
             "type": "boolean",
           },
           "conversationId": {
@@ -4757,7 +4757,7 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
           },
           "confirm": {
             "default": false,
-            "description": "Really send this mail to more than 5 people. Without it the tool does nothing but say what would happen. Pass true only after the user agreed",
+            "description": "Really send this mail to more than 5 people. Pass true only after the user agreed",
             "type": "boolean",
           },
           "conversationId": {
@@ -4838,7 +4838,7 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
           },
           "confirm": {
             "default": false,
-            "description": "Really send this mail to more than 5 people. Without it the tool does nothing but say what would happen. Pass true only after the user agreed",
+            "description": "Really send this mail to more than 5 people. Pass true only after the user agreed",
             "type": "boolean",
           },
           "conversationId": {
