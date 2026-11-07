@@ -8,6 +8,7 @@ Ask in plain words, for example:
 
 - *"What came in today that still needs an answer?"*
 - *"Summarize ticket #12345, including the PDF the customer attached."*
+- *"Which tickets did I reply to last month that are still open?"*
 - *"Write a draft reply based on our standard answer about refunds, and ask Sam in a note to check it."*
 - *"What did customers ask about most this month, and which questions could a help article answer?"*
 - *"How did the support team handle complaints this month, and what went well?"*
@@ -115,11 +116,12 @@ Settings take only `1` or `0`. Anything else, like `true`, stops the server, so 
 Groove's API calls tickets *conversations*, mailboxes *channels*, and colleagues *agents*. Tool names follow Groove; this README says ticket, mailbox, and colleague.
 
 <details>
-<summary>All 46 tools</summary>
+<summary>All 47 tools</summary>
 
 **Tickets**
 
 - `listConversations`: search and filter tickets on almost anything Groove can filter on, such as keyword, state, agent, team, contact, tag, Smart Folder, or date, sort them, and get the total in one call
+- `listConversationAuthors`: who replied or left a note, and in which tickets, with the same filters as `listConversations` plus a date range for the messages themselves. Groove can't filter on this, so the server reads the tickets, 40 per request, and returns totals per agent instead of the threads. It reads up to 1,000 tickets on its own, and asks first above that
 - `getConversation`: get one ticket
 - `listLinkedResources`, `linkResource`: see and add links from a ticket to items in other systems, such as Jira issues
 - `createConversation`: start a new ticket by sending an email, in a chosen `state`
@@ -207,6 +209,7 @@ Your MCP client will usually ask before a tool runs. Every tool is labeled as re
 - **Smart Folders follow the token.** You see the folders that the token's agent can open, so personal ones like Mine are that agent's.
 - **Deleted and moved messages can still show up.** Groove can return deleted notes, mail moved to another ticket, and undone mail as an empty message.
 - **Companies come from mail domains.** Groove creates them by itself, often without a name, and a contact can have several. `updateContact` adds or removes one and keeps the others, and it also manages extra email addresses.
+- **Finding an agent's tickets is slow.** Groove has no author filter, so `listConversationAuthors` reads every matching ticket. A year of a busy mailbox is a few hundred requests.
 - **0 tickets doesn't always mean unused.** A contact's mail can sit in someone else's ticket after a merge. Deleting that contact leaves the mail without its sender, and there's no practical way to check this beforehand.
 
 ## Why this fork

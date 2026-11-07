@@ -45,6 +45,18 @@ function respond(query, variables = {}) {
   if (query.trim().startsWith('mutation')) {
     return { data: { [field]: { conversation: ticket, target: ticket, contact, errors: [] } } };
   }
+  if (operation === 'ListAuthors' || operation === 'ListAuthorsPage') {
+    const authorPage = (id) => ({
+      nodes: [
+        { change: { id: `msg_${id}_1`, isNote: false, createdAt: '2020-01-02T00:00:00Z', author: { id: 'ag_1', name: 'Agent' } } },
+        { change: { id: `msg_${id}_2`, isNote: true, createdAt: '2020-01-03T00:00:00Z', author: { id: 'ag_2', name: 'Other' } } },
+        { change: { id: `msg_${id}_3`, isNote: false, createdAt: '2020-01-01T00:00:00Z', author: {} } },
+      ],
+      pageInfo: page,
+    });
+    if (operation === 'ListAuthorsPage') return { data: { events: authorPage(variables.conversationId) } };
+    return { data: Object.fromEntries(Object.entries(variables).map(([key, id]) => [key.replace('c', 'e'), authorPage(id)])) };
+  }
   if (field === 'node') {
     const node = nodes[operation];
     return { data: { node: node && { ...node, id: variables.id } } };
@@ -88,8 +100,10 @@ beforeAll(async () => {
     req.on('end', () => {
       const { query, variables } = JSON.parse(body || '{}');
       requests.push({ operation: query.match(/(?:query|mutation)\s+(\w+)/)?.[1], variables });
+      const custom = answer(query, variables, res);
+      if (custom === 'handled') return;
       res.setHeader('content-type', 'application/json');
-      res.end(JSON.stringify(answer(query, variables) ?? respond(query, variables)));
+      res.end(JSON.stringify(custom ?? respond(query, variables)));
     });
   });
   await new Promise(resolve => api.listen(0, '127.0.0.1', resolve));
@@ -117,6 +131,7 @@ async function call(name, args, options = ALL_ON, custom = () => undefined) {
 // [tool, arguments, the Groove operation it ends with, a check on the result]
 const normalPaths = [
   ['listConversations', {}, 'ListConversations', r => expect(r.conversations[0].id).toBe('cnv_1')],
+  ['listConversationAuthors', {}, 'ListAuthors', r => expect(r).toMatchObject({ matched: 1, read: 1, requests: 3, agents: [{ id: 'ag_1', tickets: 1, replies: 1, notes: 0 }, { id: 'ag_2', tickets: 1, replies: 0, notes: 1 }] })],
   ['getConversation', { id: '1' }, 'GetConversation', r => expect(r.id).toBe('cnv_1')],
   ['listLinkedResources', { conversationId: '1' }, 'ListLinkedResources', r => expect(r[0].externalId).toBe('IT-1')],
   ['linkResource', { conversationId: '1', provider: 'JIRA_CLOUD', externalId: 'IT-1', title: 'Issue', url: 'https://example.atlassian.net/browse/IT-1' }, 'ConversationLinkResource', r => expect(r.linked.externalId).toBe('IT-1')],
@@ -900,4 +915,105 @@ describe('values outside a list', () => {
       expect(result.operations).toEqual([]);
     },
   );
+});
+
+describe('listConversationAuthors', () => {
+  // Two tickets, each with a reply by ag_1 (Jan 2) and a note by ag_2 (Jan 3); the fake answers that for any ticket
+  const twoTickets = query => {
+    if (!query.includes('ListConversations')) return undefined;
+    return { data: { conversations: { nodes: [{ ...ticket, id: 'cnv_1', number: 1 }, { ...ticket, id: 'cnv_2', number: 2, subject: 'Second' }], pageInfo: page, totalCount: 2, totalCountCapped: false } } };
+  };
+
+  test('totals per agent over every ticket, in a count, a page and one batch', async () => {
+    const result = await call('listConversationAuthors', { channelId: 'ch_1' }, ALL_ON, twoTickets);
+    expect(result.json).toMatchObject({ matched: 2, read: 2, ticketsWithAgentMessages: 2, requests: 3 });
+    expect(result.json.agents).toEqual([
+      { id: 'ag_1', name: 'Agent', tickets: 2, replies: 2, notes: 0, first: '2020-01-02T00:00:00Z', last: '2020-01-02T00:00:00Z' },
+      { id: 'ag_2', name: 'Other', tickets: 2, replies: 0, notes: 2, first: '2020-01-03T00:00:00Z', last: '2020-01-03T00:00:00Z' },
+    ]);
+    expect(result.json.tickets).toBeUndefined();
+    expect(result.operations).toEqual(['ListConversations', 'ListConversations', 'ListAuthors']);
+  });
+
+  test('agentId lists that agent\'s tickets and counts only them', async () => {
+    const result = await call('listConversationAuthors', { agentId: 'ag_2' }, ALL_ON, twoTickets);
+    expect(result.json.agents).toEqual([expect.objectContaining({ id: 'ag_2', tickets: 2, notes: 2 })]);
+    expect(result.json.tickets).toEqual([
+      { number: 1, subject: 'Hello', replies: 0, notes: 1, first: '2020-01-03T00:00:00Z', last: '2020-01-03T00:00:00Z' },
+      { number: 2, subject: 'Second', replies: 0, notes: 1, first: '2020-01-03T00:00:00Z', last: '2020-01-03T00:00:00Z' },
+    ]);
+  });
+
+  test('writtenAfter and writtenBefore apply to the messages, not the tickets', async () => {
+    const result = await call('listConversationAuthors', { writtenAfter: '2020-01-03', writtenBefore: '2020-01-03T23:59:59Z' }, ALL_ON, twoTickets);
+    expect(result.json.agents.map(a => a.id)).toEqual(['ag_2']);
+    expect((await call('listConversationAuthors', { writtenAfter: 'soon' })).json.error).toContain('writtenAfter must be a date');
+  });
+
+  test('more than 1,000 matching tickets reads nothing without confirm', async () => {
+    const many = query => query.includes('ListConversations')
+      ? { data: { conversations: { nodes: [ticket], pageInfo: page, totalCount: 1500, totalCountCapped: false } } }
+      : undefined;
+    const result = await call('listConversationAuthors', {}, ALL_ON, many);
+    expect(result.json).toMatchObject({ matched: 1500, read: 0, requests: 1, needsConfirm: true });
+    expect(result.json.message).toContain('confirm: true');
+    expect(result.operations).toEqual(['ListConversations']);
+    const confirmed = await call('listConversationAuthors', { confirm: true }, ALL_ON, many);
+    expect(confirmed.json.read).toBe(1);
+    expect(confirmed.operations).toContain('ListAuthors');
+  });
+
+  test('more than 5,000 or an uncounted match is refused', async () => {
+    const tooMany = query => query.includes('ListConversations')
+      ? { data: { conversations: { nodes: [ticket], pageInfo: page, totalCount: 6000, totalCountCapped: false } } }
+      : undefined;
+    expect((await call('listConversationAuthors', { confirm: true }, ALL_ON, tooMany)).json.error).toContain('Narrow the filter');
+    const capped = query => query.includes('ListConversations')
+      ? { data: { conversations: { nodes: [ticket], pageInfo: page, totalCount: 10, totalCountCapped: true } } }
+      : undefined;
+    expect((await call('listConversationAuthors', {}, ALL_ON, capped)).json.error).toContain('More than 10 tickets');
+  });
+
+  test('a ticket whose messages fail is reported, and the others are still counted', async () => {
+    const answer = (query, variables) => {
+      if (query.includes('ListConversations')) return twoTickets(query);
+      if (query.includes('ListAuthors') && Object.values(variables).includes('cnv_2')) return { errors: [{ message: 'broken history item' }] };
+      return undefined;
+    };
+    const result = await call('listConversationAuthors', {}, ALL_ON, answer);
+    expect(result.json).toMatchObject({ read: 2, failed: [2], ticketsWithAgentMessages: 1 });
+    expect(result.json.agents.map(a => [a.id, a.tickets])).toEqual([['ag_1', 1], ['ag_2', 1]]);
+  });
+
+  test('a failed request stops the call instead of retrying every ticket', async () => {
+    let batches = 0;
+    const answer = (query, variables, res) => {
+      if (query.includes('ListConversations')) return twoTickets(query);
+      if (query.includes('ListAuthors')) { batches++; res.statusCode = 502; res.end('bad gateway'); return 'handled'; }
+      return undefined;
+    };
+    const result = await call('listConversationAuthors', {}, ALL_ON, answer);
+    expect(result.json.error).toContain('HTTP 502');
+    expect(batches).toBe(1);
+  });
+
+  test('writtenBefore is a date before which, so a whole month ends on the first of the next', async () => {
+    const result = await call('listConversationAuthors', { writtenBefore: '2020-01-03' }, ALL_ON, twoTickets);
+    expect(result.json.agents.map(a => a.id)).toEqual(['ag_1']);
+  });
+
+  test('a second page of messages is read for the ticket that has one', async () => {
+    const answer = (query, variables) => {
+      if (query.includes('ListConversations')) return twoTickets(query);
+      if (query.includes('ListAuthorsPage')) return { data: { events: { nodes: [{ change: { id: 'msg_x', isNote: false, createdAt: '2020-01-09T00:00:00Z', author: { id: 'ag_1', name: 'Agent' } } }], pageInfo: page } } };
+      if (query.includes('ListAuthors')) {
+        const first = { nodes: [{ change: { id: 'msg_a', isNote: false, createdAt: '2020-01-02T00:00:00Z', author: { id: 'ag_1', name: 'Agent' } } }], pageInfo: { hasNextPage: true, endCursor: 'c1' } };
+        return { data: { e0: first, e1: { ...first, pageInfo: page } } };
+      }
+      return undefined;
+    };
+    const result = await call('listConversationAuthors', {}, ALL_ON, answer);
+    expect(result.json.agents).toEqual([expect.objectContaining({ id: 'ag_1', tickets: 2, replies: 3, last: '2020-01-09T00:00:00Z' })]);
+    expect(result.operations.filter(o => o === 'ListAuthorsPage')).toHaveLength(1);
+  });
 });

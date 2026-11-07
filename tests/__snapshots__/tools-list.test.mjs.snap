@@ -5,6 +5,7 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
   "combinations": {
     "(all off)": [
       "listConversations",
+      "listConversationAuthors",
       "getConversation",
       "listLinkedResources",
       "logConversation",
@@ -46,6 +47,7 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
     ],
     "allowAttachments": [
       "listConversations",
+      "listConversationAuthors",
       "getConversation",
       "listLinkedResources",
       "logConversation (3)",
@@ -87,6 +89,7 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
     ],
     "allowMerge": [
       "listConversations",
+      "listConversationAuthors",
       "getConversation",
       "listLinkedResources",
       "logConversation",
@@ -130,6 +133,7 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
     ],
     "allowMerge + allowAttachments": [
       "listConversations",
+      "listConversationAuthors",
       "getConversation",
       "listLinkedResources",
       "logConversation (3)",
@@ -173,6 +177,7 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
     ],
     "allowMerge + allowPermanentDelete": [
       "listConversations",
+      "listConversationAuthors",
       "getConversation",
       "listLinkedResources",
       "logConversation",
@@ -217,6 +222,7 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
     ],
     "allowMerge + allowPermanentDelete + allowAttachments": [
       "listConversations",
+      "listConversationAuthors",
       "getConversation",
       "listLinkedResources",
       "logConversation (3)",
@@ -261,6 +267,7 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
     ],
     "allowPermanentDelete": [
       "listConversations",
+      "listConversationAuthors",
       "getConversation",
       "listLinkedResources",
       "logConversation",
@@ -303,6 +310,7 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
     ],
     "allowPermanentDelete + allowAttachments": [
       "listConversations",
+      "listConversationAuthors",
       "getConversation",
       "listLinkedResources",
       "logConversation (3)",
@@ -345,6 +353,7 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
     ],
     "allowSend": [
       "listConversations",
+      "listConversationAuthors",
       "getConversation",
       "listLinkedResources",
       "createConversation",
@@ -390,6 +399,7 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
     ],
     "allowSend + allowAttachments": [
       "listConversations",
+      "listConversationAuthors",
       "getConversation",
       "listLinkedResources",
       "createConversation (3)",
@@ -435,6 +445,7 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
     ],
     "allowSend + allowMerge": [
       "listConversations",
+      "listConversationAuthors",
       "getConversation",
       "listLinkedResources",
       "createConversation",
@@ -482,6 +493,7 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
     ],
     "allowSend + allowMerge + allowAttachments": [
       "listConversations",
+      "listConversationAuthors",
       "getConversation",
       "listLinkedResources",
       "createConversation (3)",
@@ -529,6 +541,7 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
     ],
     "allowSend + allowMerge + allowPermanentDelete": [
       "listConversations",
+      "listConversationAuthors",
       "getConversation",
       "listLinkedResources",
       "createConversation",
@@ -577,6 +590,7 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
     ],
     "allowSend + allowMerge + allowPermanentDelete + allowAttachments": [
       "listConversations",
+      "listConversationAuthors",
       "getConversation",
       "listLinkedResources",
       "createConversation (3)",
@@ -625,6 +639,7 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
     ],
     "allowSend + allowPermanentDelete": [
       "listConversations",
+      "listConversationAuthors",
       "getConversation",
       "listLinkedResources",
       "createConversation",
@@ -671,6 +686,7 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
     ],
     "allowSend + allowPermanentDelete + allowAttachments": [
       "listConversations",
+      "listConversationAuthors",
       "getConversation",
       "listLinkedResources",
       "createConversation (3)",
@@ -717,6 +733,7 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
     ],
     "allowSend + allowSendAs": [
       "listConversations",
+      "listConversationAuthors",
       "getConversation",
       "listLinkedResources",
       "createConversation (2)",
@@ -762,6 +779,7 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
     ],
     "allowSend + allowSendAs + allowAttachments": [
       "listConversations",
+      "listConversationAuthors",
       "getConversation",
       "listLinkedResources",
       "createConversation (4)",
@@ -807,6 +825,7 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
     ],
     "allowSend + allowSendAs + allowMerge": [
       "listConversations",
+      "listConversationAuthors",
       "getConversation",
       "listLinkedResources",
       "createConversation (2)",
@@ -854,6 +873,7 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
     ],
     "allowSend + allowSendAs + allowMerge + allowAttachments": [
       "listConversations",
+      "listConversationAuthors",
       "getConversation",
       "listLinkedResources",
       "createConversation (4)",
@@ -901,6 +921,7 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
     ],
     "allowSend + allowSendAs + allowMerge + allowPermanentDelete": [
       "listConversations",
+      "listConversationAuthors",
       "getConversation",
       "listLinkedResources",
       "createConversation (2)",
@@ -949,6 +970,7 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
     ],
     "allowSend + allowSendAs + allowMerge + allowPermanentDelete + allowAttachments": [
       "listConversations",
+      "listConversationAuthors",
       "getConversation",
       "listLinkedResources",
       "createConversation (4)",
@@ -997,6 +1019,7 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
     ],
     "allowSend + allowSendAs + allowPermanentDelete": [
       "listConversations",
+      "listConversationAuthors",
       "getConversation",
       "listLinkedResources",
       "createConversation (2)",
@@ -1043,6 +1066,7 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
     ],
     "allowSend + allowSendAs + allowPermanentDelete + allowAttachments": [
       "listConversations",
+      "listConversationAuthors",
       "getConversation",
       "listLinkedResources",
       "createConversation (4)",
@@ -1089,6 +1113,7 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
     ],
     "allowSendAs": [
       "listConversations",
+      "listConversationAuthors",
       "getConversation",
       "listLinkedResources",
       "logConversation (2)",
@@ -1130,6 +1155,7 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
     ],
     "allowSendAs + allowAttachments": [
       "listConversations",
+      "listConversationAuthors",
       "getConversation",
       "listLinkedResources",
       "logConversation (4)",
@@ -1171,6 +1197,7 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
     ],
     "allowSendAs + allowMerge": [
       "listConversations",
+      "listConversationAuthors",
       "getConversation",
       "listLinkedResources",
       "logConversation (2)",
@@ -1214,6 +1241,7 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
     ],
     "allowSendAs + allowMerge + allowAttachments": [
       "listConversations",
+      "listConversationAuthors",
       "getConversation",
       "listLinkedResources",
       "logConversation (4)",
@@ -1257,6 +1285,7 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
     ],
     "allowSendAs + allowMerge + allowPermanentDelete": [
       "listConversations",
+      "listConversationAuthors",
       "getConversation",
       "listLinkedResources",
       "logConversation (2)",
@@ -1301,6 +1330,7 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
     ],
     "allowSendAs + allowMerge + allowPermanentDelete + allowAttachments": [
       "listConversations",
+      "listConversationAuthors",
       "getConversation",
       "listLinkedResources",
       "logConversation (4)",
@@ -1345,6 +1375,7 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
     ],
     "allowSendAs + allowPermanentDelete": [
       "listConversations",
+      "listConversationAuthors",
       "getConversation",
       "listLinkedResources",
       "logConversation (2)",
@@ -1387,6 +1418,7 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
     ],
     "allowSendAs + allowPermanentDelete + allowAttachments": [
       "listConversations",
+      "listConversationAuthors",
       "getConversation",
       "listLinkedResources",
       "logConversation (4)",
@@ -1429,6 +1461,7 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
     ],
     "readOnly": [
       "listConversations",
+      "listConversationAuthors",
       "getConversation",
       "listLinkedResources",
       "listMessages",
@@ -1452,6 +1485,7 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
     ],
     "readOnly + allowAttachments": [
       "listConversations",
+      "listConversationAuthors",
       "getConversation",
       "listLinkedResources",
       "listMessages",
@@ -1475,6 +1509,7 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
     ],
     "readOnly + allowMerge": [
       "listConversations",
+      "listConversationAuthors",
       "getConversation",
       "listLinkedResources",
       "listMessages",
@@ -1498,6 +1533,7 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
     ],
     "readOnly + allowMerge + allowAttachments": [
       "listConversations",
+      "listConversationAuthors",
       "getConversation",
       "listLinkedResources",
       "listMessages",
@@ -1521,6 +1557,7 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
     ],
     "readOnly + allowMerge + allowPermanentDelete": [
       "listConversations",
+      "listConversationAuthors",
       "getConversation",
       "listLinkedResources",
       "listMessages",
@@ -1544,6 +1581,7 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
     ],
     "readOnly + allowMerge + allowPermanentDelete + allowAttachments": [
       "listConversations",
+      "listConversationAuthors",
       "getConversation",
       "listLinkedResources",
       "listMessages",
@@ -1567,6 +1605,7 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
     ],
     "readOnly + allowPermanentDelete": [
       "listConversations",
+      "listConversationAuthors",
       "getConversation",
       "listLinkedResources",
       "listMessages",
@@ -1590,6 +1629,7 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
     ],
     "readOnly + allowPermanentDelete + allowAttachments": [
       "listConversations",
+      "listConversationAuthors",
       "getConversation",
       "listLinkedResources",
       "listMessages",
@@ -1613,6 +1653,7 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
     ],
     "readOnly + allowSend": [
       "listConversations",
+      "listConversationAuthors",
       "getConversation",
       "listLinkedResources",
       "listMessages",
@@ -1636,6 +1677,7 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
     ],
     "readOnly + allowSend + allowAttachments": [
       "listConversations",
+      "listConversationAuthors",
       "getConversation",
       "listLinkedResources",
       "listMessages",
@@ -1659,6 +1701,7 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
     ],
     "readOnly + allowSend + allowMerge": [
       "listConversations",
+      "listConversationAuthors",
       "getConversation",
       "listLinkedResources",
       "listMessages",
@@ -1682,6 +1725,7 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
     ],
     "readOnly + allowSend + allowMerge + allowAttachments": [
       "listConversations",
+      "listConversationAuthors",
       "getConversation",
       "listLinkedResources",
       "listMessages",
@@ -1705,6 +1749,7 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
     ],
     "readOnly + allowSend + allowMerge + allowPermanentDelete": [
       "listConversations",
+      "listConversationAuthors",
       "getConversation",
       "listLinkedResources",
       "listMessages",
@@ -1728,6 +1773,7 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
     ],
     "readOnly + allowSend + allowMerge + allowPermanentDelete + allowAttachments": [
       "listConversations",
+      "listConversationAuthors",
       "getConversation",
       "listLinkedResources",
       "listMessages",
@@ -1751,6 +1797,7 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
     ],
     "readOnly + allowSend + allowPermanentDelete": [
       "listConversations",
+      "listConversationAuthors",
       "getConversation",
       "listLinkedResources",
       "listMessages",
@@ -1774,6 +1821,7 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
     ],
     "readOnly + allowSend + allowPermanentDelete + allowAttachments": [
       "listConversations",
+      "listConversationAuthors",
       "getConversation",
       "listLinkedResources",
       "listMessages",
@@ -1797,6 +1845,7 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
     ],
     "readOnly + allowSend + allowSendAs": [
       "listConversations",
+      "listConversationAuthors",
       "getConversation",
       "listLinkedResources",
       "listMessages",
@@ -1820,6 +1869,7 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
     ],
     "readOnly + allowSend + allowSendAs + allowAttachments": [
       "listConversations",
+      "listConversationAuthors",
       "getConversation",
       "listLinkedResources",
       "listMessages",
@@ -1843,6 +1893,7 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
     ],
     "readOnly + allowSend + allowSendAs + allowMerge": [
       "listConversations",
+      "listConversationAuthors",
       "getConversation",
       "listLinkedResources",
       "listMessages",
@@ -1866,6 +1917,7 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
     ],
     "readOnly + allowSend + allowSendAs + allowMerge + allowAttachments": [
       "listConversations",
+      "listConversationAuthors",
       "getConversation",
       "listLinkedResources",
       "listMessages",
@@ -1889,6 +1941,7 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
     ],
     "readOnly + allowSend + allowSendAs + allowMerge + allowPermanentDelete": [
       "listConversations",
+      "listConversationAuthors",
       "getConversation",
       "listLinkedResources",
       "listMessages",
@@ -1912,6 +1965,7 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
     ],
     "readOnly + allowSend + allowSendAs + allowMerge + allowPermanentDelete + allowAttachments": [
       "listConversations",
+      "listConversationAuthors",
       "getConversation",
       "listLinkedResources",
       "listMessages",
@@ -1935,6 +1989,7 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
     ],
     "readOnly + allowSend + allowSendAs + allowPermanentDelete": [
       "listConversations",
+      "listConversationAuthors",
       "getConversation",
       "listLinkedResources",
       "listMessages",
@@ -1958,6 +2013,7 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
     ],
     "readOnly + allowSend + allowSendAs + allowPermanentDelete + allowAttachments": [
       "listConversations",
+      "listConversationAuthors",
       "getConversation",
       "listLinkedResources",
       "listMessages",
@@ -1981,6 +2037,7 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
     ],
     "readOnly + allowSendAs": [
       "listConversations",
+      "listConversationAuthors",
       "getConversation",
       "listLinkedResources",
       "listMessages",
@@ -2004,6 +2061,7 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
     ],
     "readOnly + allowSendAs + allowAttachments": [
       "listConversations",
+      "listConversationAuthors",
       "getConversation",
       "listLinkedResources",
       "listMessages",
@@ -2027,6 +2085,7 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
     ],
     "readOnly + allowSendAs + allowMerge": [
       "listConversations",
+      "listConversationAuthors",
       "getConversation",
       "listLinkedResources",
       "listMessages",
@@ -2050,6 +2109,7 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
     ],
     "readOnly + allowSendAs + allowMerge + allowAttachments": [
       "listConversations",
+      "listConversationAuthors",
       "getConversation",
       "listLinkedResources",
       "listMessages",
@@ -2073,6 +2133,7 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
     ],
     "readOnly + allowSendAs + allowMerge + allowPermanentDelete": [
       "listConversations",
+      "listConversationAuthors",
       "getConversation",
       "listLinkedResources",
       "listMessages",
@@ -2096,6 +2157,7 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
     ],
     "readOnly + allowSendAs + allowMerge + allowPermanentDelete + allowAttachments": [
       "listConversations",
+      "listConversationAuthors",
       "getConversation",
       "listLinkedResources",
       "listMessages",
@@ -2119,6 +2181,7 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
     ],
     "readOnly + allowSendAs + allowPermanentDelete": [
       "listConversations",
+      "listConversationAuthors",
       "getConversation",
       "listLinkedResources",
       "listMessages",
@@ -2142,6 +2205,7 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
     ],
     "readOnly + allowSendAs + allowPermanentDelete + allowAttachments": [
       "listConversations",
+      "listConversationAuthors",
       "getConversation",
       "listLinkedResources",
       "listMessages",
@@ -3522,6 +3586,167 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
       },
       "name": "listContacts",
     },
+    "listConversationAuthors": {
+      "annotations": {
+        "readOnlyHint": true,
+      },
+      "description": "Who replied or left a note in which tickets. Groove cannot filter on this, so the tool reads the messages of every matching ticket itself, 40 tickets per request, and returns totals per agent: tickets, replies, notes, first and last message. With agentId it also lists that agent's tickets. Use this instead of calling listMessages per ticket. It takes the filters of listConversations, plus writtenAfter and writtenBefore for the messages themselves. Up to 1000 matching tickets are read without asking; above that it stops and needs confirm: true",
+      "inputSchema": {
+        "properties": {
+          "agentId": {
+            "description": "Only count this agent, and list the tickets they wrote in",
+            "type": "string",
+          },
+          "assignedAgentId": {
+            "description": "Filter by assigned agent ID",
+            "type": "string",
+          },
+          "assignedTeamId": {
+            "description": "Filter by assigned team ID",
+            "type": "string",
+          },
+          "channelId": {
+            "description": "Filter by channel ID",
+            "type": "string",
+          },
+          "confirm": {
+            "default": false,
+            "description": "Read more than 1000 tickets. Only after the user agreed to the number of requests",
+            "type": "boolean",
+          },
+          "contactEmail": {
+            "description": "Only tickets from the contact with this email address",
+            "type": "string",
+          },
+          "contactId": {
+            "description": "Filter by contact ID",
+            "type": "string",
+          },
+          "createdAfter": {
+            "description": "Only tickets created on or after this moment, as an ISO date or date-time (2026-10-01 means midnight UTC)",
+            "type": "string",
+          },
+          "createdBefore": {
+            "description": "Only tickets created on or before this moment, as an ISO date or date-time. For all of October, use 2026-10-31T23:59:59Z",
+            "type": "string",
+          },
+          "deleted": {
+            "description": "true for tickets in the trash only, false for tickets outside it",
+            "type": "boolean",
+          },
+          "draftAuthorId": {
+            "description": "Only tickets where this agent has an unsent draft",
+            "type": "string",
+          },
+          "draftType": {
+            "description": "Only tickets with an unsent draft of this kind",
+            "enum": [
+              "reply",
+              "reply_all",
+              "note",
+            ],
+            "type": "string",
+          },
+          "folderId": {
+            "description": "Only tickets in this Smart Folder. Get the ID from listFolders. Don't combine it with channelId, unless that mailbox is listed for the folder.",
+            "type": "string",
+          },
+          "keywords": {
+            "description": "Full-text search across conversations",
+            "type": "string",
+          },
+          "mentionedAgentId": {
+            "description": "Only tickets where this agent was @mentioned in a note",
+            "type": "string",
+          },
+          "rating": {
+            "description": "Only tickets whose latest customer rating is this; any means rated at all",
+            "enum": [
+              "any",
+              "awesome",
+              "ok",
+              "bad",
+            ],
+            "type": "string",
+          },
+          "starred": {
+            "description": "true for starred tickets only, false for tickets without a star",
+            "type": "boolean",
+          },
+          "state": {
+            "description": "Filter by conversation state. opened also includes unread, but leaves out snoozed: ask for snoozed separately to see every ticket that still needs work. For tickets in the trash, use deleted",
+            "enum": [
+              "unread",
+              "opened",
+              "closed",
+              "snoozed",
+              "spam",
+            ],
+            "type": "string",
+          },
+          "states": {
+            "description": "Tickets in any of these states, for example ["opened", "snoozed"]. Ignored when state is set",
+            "items": {
+              "enum": [
+                "unread",
+                "opened",
+                "closed",
+                "snoozed",
+                "spam",
+              ],
+              "type": "string",
+            },
+            "type": "array",
+          },
+          "tagIds": {
+            "description": "Filter by tag IDs",
+            "items": {
+              "type": "string",
+            },
+            "type": "array",
+          },
+          "tagNames": {
+            "description": "Tickets with any of these tag names, without looking up their IDs first",
+            "items": {
+              "type": "string",
+            },
+            "type": "array",
+          },
+          "type": {
+            "description": "Only tickets that came in this way",
+            "items": {
+              "enum": [
+                "email",
+                "chat",
+                "widget",
+                "facebook",
+                "twitter",
+              ],
+              "type": "string",
+            },
+            "type": "array",
+          },
+          "updatedAfter": {
+            "description": "Only tickets updated on or after this moment, as an ISO date or date-time",
+            "type": "string",
+          },
+          "updatedBefore": {
+            "description": "Only tickets updated on or before this moment, as an ISO date or date-time",
+            "type": "string",
+          },
+          "writtenAfter": {
+            "description": "Only messages written on or after this date (a date alone means midnight UTC). Combine with updatedAfter so the ticket list stays small",
+            "type": "string",
+          },
+          "writtenBefore": {
+            "description": "Only messages written before this date. A date alone means midnight UTC at its start, so for a whole month give the first day of the next one",
+            "type": "string",
+          },
+        },
+        "type": "object",
+      },
+      "name": "listConversationAuthors",
+    },
     "listConversations": {
       "annotations": {
         "readOnlyHint": true,
@@ -3751,7 +3976,7 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
       "annotations": {
         "readOnlyHint": true,
       },
-      "description": "List messages and notes in a conversation, oldest first. Groove can still return notes that were deleted, and mail that was moved to another ticket",
+      "description": "List messages and notes in a conversation, oldest first. Groove can still return notes that were deleted, and mail that was moved to another ticket. To see who wrote in many tickets, use listConversationAuthors instead of calling this per ticket",
       "inputSchema": {
         "properties": {
           "conversationId": {

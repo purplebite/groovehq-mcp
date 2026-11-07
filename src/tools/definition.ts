@@ -8,6 +8,7 @@ import type { TeamTools } from './teams.js';
 import type { FolderTools } from './folders.js';
 import type { DraftTools } from './drafts.js';
 import type { KnowledgeBaseResources } from '../resources/kb-articles.js';
+import type { AuthorTools } from './authors.js';
 import type { AttachmentReader } from './attachment-reader/index.js';
 import type { CannedReplyTools } from './canned-replies.js';
 import type { RuleTools } from './rules.js';
@@ -77,6 +78,7 @@ export interface ToolContext {
   attachmentReader: AttachmentReader;
   cannedReplies: CannedReplyTools;
   rules: RuleTools;
+  authors: AuthorTools;
 }
 
 export type ContentBlock =

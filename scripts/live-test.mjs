@@ -560,6 +560,15 @@ await test('listConversations searches by keyword', async () => {
   return `${conversations.length} found`;
 });
 
+await test('listConversationAuthors totals the agents of one mailbox over a week', async () => {
+  const since = new Date(Date.now() - 7 * 86400e3).toISOString().slice(0, 10);
+  const result = await call('listConversationAuthors', { channelId: ticket.channel.id, createdAfter: since });
+  expect(typeof result.matched === 'number' && typeof result.requests === 'number', 'no counts');
+  if (result.needsConfirm) return `${result.matched} tickets match, more than it reads unasked`;
+  expect(result.read === result.matched && Array.isArray(result.agents), 'wrong shape');
+  return `${result.read} tickets, ${result.agents.length} agents, ${result.requests} requests`;
+});
+
 await test('getConversation works by number and by ID', async () => {
   for (const id of [`${ticket.number}`, `#${ticket.number}`, ticket.id]) {
     expect((await call('getConversation', { id })).id === ticket.id, `wrong ticket for ${id}`);

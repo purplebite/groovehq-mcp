@@ -19,6 +19,7 @@ import * as drafts from './tools/drafts.js';
 import * as attachmentReader from './tools/attachment-reader/index.js';
 import * as cannedReplies from './tools/canned-replies.js';
 import * as rules from './tools/rules.js';
+import * as authors from './tools/authors.js';
 import * as kb from './resources/kb-articles.js';
 import {
   ATTACHMENTS_SCHEMA,
@@ -50,6 +51,7 @@ const BOOLEAN_OPTIONS = ['readOnly', 'allowSend', 'allowSendAs', 'allowMerge', '
 // tools/list returns them in this order
 const TOOLS: Tool[] = [
   conversations.listConversations,
+  authors.listConversationAuthors,
   conversations.getConversation,
   conversations.listLinkedResources,
   conversations.createConversation,
@@ -222,6 +224,7 @@ export function createGrooveServer(opts: GrooveServerOptions): Server {
     attachmentReader: new attachmentReader.AttachmentReader(),
     cannedReplies: new cannedReplies.CannedReplyTools(grooveClient),
     rules: new rules.RuleTools(grooveClient),
+    authors: new authors.AuthorTools(grooveClient),
   };
 
   const server = new Server(

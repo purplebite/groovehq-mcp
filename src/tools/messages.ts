@@ -313,7 +313,7 @@ export const listMessages = defineTool<ListMessagesArgs>({
   name: 'listMessages',
   setting: 'read',
   annotations: READ_TOOL,
-  description: 'List messages and notes in a conversation, oldest first. Groove can still return notes that were deleted, and mail that was moved to another ticket',
+  description: 'List messages and notes in a conversation, oldest first. Groove can still return notes that were deleted, and mail that was moved to another ticket. To see who wrote in many tickets, use listConversationAuthors instead of calling this per ticket',
   inputSchema: {
     type: 'object',
     properties: {
