@@ -170,7 +170,18 @@ export class MessageTools {
     return { toggled: true, messageId, reaction };
   }
 
-  async deleteNote(messageId: string) {
+  async deleteNote(args: { messageId: string; confirm?: boolean }) {
+    const { messageId } = args;
+    const response = await this.client.request<{ node: { isNote?: boolean; bodyPlainText?: string; createdAt?: string; author?: { name?: string; email?: string } | null } | null }>(queries.getNote, { id: messageId });
+    const note = response.node;
+    if (!note?.isNote) throw new Error(`Note not found: ${messageId}`);
+    if (args.confirm !== true) {
+      const text = note.bodyPlainText ?? '';
+      return {
+        deleted: false,
+        wouldDelete: { messageId, author: note.author?.email ?? note.author?.name ?? null, createdAt: note.createdAt, text: text.length > 200 ? `${text.slice(0, 200)}…` : text },
+      };
+    }
     await this.client.mutate(mutations.conversationDeleteNote, 'conversationDeleteNote', {
       messageId,
     });
@@ -279,11 +290,12 @@ export const reactToNote = defineTool<{ messageId: string; reaction: string }>({
   handler: (args, { messages }) => messages.reactToNote(args.messageId, args.reaction),
 });
 
-export const deleteNote = defineTool<{ messageId: string }>({
+export const deleteNote = defineTool<{ messageId: string; confirm?: boolean }>({
   name: 'deleteNote',
   setting: 'write',
   annotations: DESTRUCTIVE_TOOL,
-  description: 'Delete an internal note. Confirm with the user first.',
+  confirm: 'delete this note',
+  description: 'Delete an internal note. Without confirm it only shows the note that would go: show that to the user first.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -294,7 +306,7 @@ export const deleteNote = defineTool<{ messageId: string }>({
     },
     required: ['messageId'],
   },
-  handler: (args, { messages }) => messages.deleteNote(args.messageId),
+  handler: (args, { messages }) => messages.deleteNote(args),
 });
 
 export const listMessages = defineTool<ListMessagesArgs>({

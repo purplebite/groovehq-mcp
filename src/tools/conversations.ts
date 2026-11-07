@@ -137,9 +137,15 @@ interface ForwardConversationArgs {
   attachments?: AttachmentArg[];
 }
 
+interface ConfirmedTicketArgs {
+  id: string;
+  confirm?: boolean;
+}
+
 interface MergeConversationsArgs {
   sourceId: string;
   targetId: string;
+  confirm?: boolean;
   allowDifferentContacts?: boolean;
   discardDrafts?: boolean;
 }
@@ -451,19 +457,30 @@ export class ConversationTools {
     }
   }
 
-  async deleteConversation(id: string) {
-    await this.removeConversation(id, 'SOFT');
-    return { deleted: true, ticket: id };
+  async deleteConversation(args: ConfirmedTicketArgs) {
+    const ticket = await this.ticketPreview(args.id);
+    if (args.confirm !== true) return { deleted: false, wouldDelete: ticket, undo: 'restoreConversation brings it back' };
+    await this.removeConversation(ticket.id, 'SOFT');
+    return { deleted: true, ticket: ticket.number };
   }
 
-  async deleteConversationPermanently(id: string) {
-    await this.removeConversation(id, 'HARD');
-    return { deleted: true, permanent: true, ticket: id };
+  async deleteConversationPermanently(args: ConfirmedTicketArgs) {
+    const ticket = await this.ticketPreview(args.id);
+    if (args.confirm !== true) return { deleted: false, permanent: true, wouldDelete: ticket, undo: 'none: this cannot be undone' };
+    await this.removeConversation(ticket.id, 'HARD');
+    return { deleted: true, permanent: true, ticket: ticket.number };
   }
 
-  private async removeConversation(id: string, deleteMode: 'SOFT' | 'HARD'): Promise<void> {
+  // What the user needs to recognise a ticket before a change that asks first
+  private async ticketPreview(id: string) {
+    const ticket = await this.getConversation(id);
+    if (!ticket) throw new Error(`Ticket not found: ${id}`);
+    return { id: ticket.id, number: ticket.number, subject: ticket.subject, contact: ticket.contact?.email ?? null, state: ticket.state };
+  }
+
+  private async removeConversation(conversationId: string, deleteMode: 'SOFT' | 'HARD'): Promise<void> {
     await this.client.mutate(mutations.conversationDelete, 'conversationDelete', {
-      conversationIds: [await this.client.resolveConversationId(id)],
+      conversationIds: [conversationId],
       deleteMode,
     });
   }
@@ -491,11 +508,15 @@ export class ConversationTools {
   }
 
   // Spam reaches past this ticket, so it only goes through markAsSpam
-  async markAsSpam(id: string): Promise<Conversation> {
+  async markAsSpam(args: ConfirmedTicketArgs) {
+    const ticket = await this.ticketPreview(args.id);
+    if (args.confirm !== true) {
+      return { spam: false, wouldMarkAsSpam: ticket, wouldBlacklist: ticket.contact, undo: 'restoreConversation brings the ticket back; the blacklist only goes in the Groove settings' };
+    }
     const payload = await this.client.mutate<{ conversation: Conversation }>(
       mutations.conversationSpam,
       'conversationSpam',
-      { conversationId: await this.client.resolveConversationId(id) }
+      { conversationId: ticket.id }
     );
 
     return payload.conversation;
@@ -592,6 +613,17 @@ export class ConversationTools {
         `Ticket #${source.number} has ${drafts.length} unsent draft(s), and a merge deletes them. ` +
           'Ask the user, then pass discardDrafts to go ahead.'
       );
+    }
+
+    if (args.confirm !== true) {
+      return {
+        merged: false,
+        wouldMerge: {
+          disappears: { number: source.number, contact: source.contact?.email ?? null },
+          stays: { number: target.number, contact: target.contact?.email ?? null },
+          draftsDeleted: drafts.length,
+        },
+      };
     }
 
     const payload = await this.client.mutate<{ target: Conversation }>(
@@ -1008,11 +1040,12 @@ export const updateConversation = defineTool<UpdateConversationArgs>({
   handler: (args, { conversations }) => conversations.updateConversation(args),
 });
 
-export const deleteConversation = defineTool<{ id: string }>({
+export const deleteConversation = defineTool<ConfirmedTicketArgs>({
   name: 'deleteConversation',
   setting: 'write',
-  annotations: ADDITIVE_TOOL,
-  description: 'Delete a ticket. restoreConversation brings it back with its messages and notes.',
+  annotations: DESTRUCTIVE_TOOL,
+  confirm: 'delete this ticket',
+  description: 'Delete a ticket. It goes to the trash, and restoreConversation brings it back with its messages and notes. Without confirm it only shows which ticket would go: show that to the user first.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -1023,14 +1056,15 @@ export const deleteConversation = defineTool<{ id: string }>({
     },
     required: ['id'],
   },
-  handler: (args, { conversations }) => conversations.deleteConversation(args.id),
+  handler: (args, { conversations }) => conversations.deleteConversation(args),
 });
 
-export const deleteConversationPermanently = defineTool<{ id: string }>({
+export const deleteConversationPermanently = defineTool<ConfirmedTicketArgs>({
   name: 'deleteConversationPermanently',
   setting: 'permanentDelete',
   annotations: DESTRUCTIVE_TOOL,
-  description: 'Delete a ticket for good. This cannot be undone, so always confirm with the user first.',
+  confirm: 'delete this ticket for good',
+  description: 'Delete a ticket for good. This cannot be undone. Without confirm it only shows which ticket would go: show that to the user first.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -1041,7 +1075,7 @@ export const deleteConversationPermanently = defineTool<{ id: string }>({
     },
     required: ['id'],
   },
-  handler: (args, { conversations }) => conversations.deleteConversationPermanently(args.id),
+  handler: (args, { conversations }) => conversations.deleteConversationPermanently(args),
 });
 
 export const restoreConversation = defineTool<{ id: string }>({
@@ -1120,12 +1154,13 @@ export const linkResource = defineTool<LinkResourceArgs>({
   handler: (args, { conversations }) => conversations.linkResource(args),
 });
 
-export const markAsSpam = defineTool<{ id: string }>({
+export const markAsSpam = defineTool<ConfirmedTicketArgs>({
   name: 'markAsSpam',
   setting: 'write',
   annotations: DESTRUCTIVE_TOOL,
+  confirm: 'mark this ticket as spam and blacklist its sender',
   description:
-    'Mark a ticket as spam. Groove also blacklists the sender, so their future mail to any mailbox is marked as spam too. Always confirm with the user first. restoreConversation brings the ticket back, but the blacklist can only be undone in the Groove settings.',
+    'Mark a ticket as spam. Groove also blacklists the sender, so their future mail to any mailbox is marked as spam too. Without confirm it only shows the ticket and the address that would be blacklisted: show that to the user first. restoreConversation brings the ticket back, but the blacklist can only be undone in the Groove settings.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -1136,7 +1171,7 @@ export const markAsSpam = defineTool<{ id: string }>({
     },
     required: ['id'],
   },
-  handler: (args, { conversations }) => conversations.markAsSpam(args.id),
+  handler: (args, { conversations }) => conversations.markAsSpam(args),
 });
 
 export const forwardConversation = defineTool<ForwardConversationArgs>({
@@ -1186,8 +1221,9 @@ export const mergeConversations = defineTool<MergeConversationsArgs>({
   name: 'mergeConversations',
   setting: 'merge',
   annotations: DESTRUCTIVE_TOOL,
+  confirm: 'merge these tickets',
   description:
-    'Permanently merge one ticket into another. This cannot be undone, so always confirm with the user first. ' +
+    'Permanently merge one ticket into another. This cannot be undone. Without confirm it only shows both tickets and which one would disappear: show that to the user first. ' +
     'The source ticket disappears. The target keeps its contact, subject and assignee. Replies and notes move over and tags are combined. ' +
     'Drafts on the source are deleted, and an open source reopens the target',
   inputSchema: {

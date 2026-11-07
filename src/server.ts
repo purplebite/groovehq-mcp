@@ -237,8 +237,17 @@ export function createGrooveServer(opts: GrooveServerOptions): Server {
     }
   );
 
-  const schemaOf = (tool: Tool): InputSchema =>
-    typeof tool.inputSchema === 'function' ? tool.inputSchema(fields) : tool.inputSchema;
+  const schemaOf = (tool: Tool): InputSchema => {
+    const schema = typeof tool.inputSchema === 'function' ? tool.inputSchema(fields) : tool.inputSchema;
+    if (!tool.confirm) return schema;
+    // Added here, so every tool that asks has the same field and the same check
+    const confirm = {
+      type: 'boolean',
+      description: `Really ${tool.confirm}. Without it the tool only shows what would happen. Pass true only after the user agreed`,
+      default: false,
+    };
+    return { ...schema, properties: { ...schema.properties, confirm } };
+  };
 
   const tools = TOOLS.filter(isEnabled).map(tool => ({
     name: tool.name,

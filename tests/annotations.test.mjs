@@ -9,11 +9,11 @@ const READ = [
   'searchKbArticles',
 ];
 const ADDITIVE = [
-  'closeConversation', 'createContact', 'createNote', 'createReplyDraft', 'deleteConversation', 'linkResource', 'logConversation', 'moveMessageToNewTicket', 'reactToNote',
+  'closeConversation', 'createContact', 'createNote', 'createReplyDraft', 'linkResource', 'logConversation', 'moveMessageToNewTicket', 'reactToNote',
   'restoreConversation', 'updateConversation',
 ];
 const DESTRUCTIVE = [
-  'createConversation', 'deleteContact', 'deleteConversationPermanently', 'deleteDraft', 'deleteNote',
+  'createConversation', 'deleteContact', 'deleteConversation', 'deleteConversationPermanently', 'deleteDraft', 'deleteNote',
   'editNote', 'forwardConversation', 'markAsSpam', 'mergeContacts', 'mergeConversations', 'sendMessage', 'undoSend',
   'updateCompany', 'updateContact',
 ];

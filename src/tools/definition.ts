@@ -108,6 +108,8 @@ export interface ToolDefinition<Args> {
   inputSchema: InputSchema | ((fields: OptionalFields) => InputSchema);
   // A clearer error for a known wrong value, per argument; not part of the schema in tools/list
   hints?: Record<string, Record<string, string>>;
+  // What the tool does, for tools that only run with confirm: true. The server adds the field; the handler shows a preview without it
+  confirm?: string;
   handler: (args: Args, context: ToolContext) => Promise<unknown>;
 }
 

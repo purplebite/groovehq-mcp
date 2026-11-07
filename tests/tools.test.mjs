@@ -26,6 +26,7 @@ const nodes = {
   GetCompany: company,
   GetKbArticle: article,
   GetChannel: channel,
+  GetNote: { __typename: 'Note', isNote: true, bodyPlainText: 'A note', createdAt: '2020-01-01T00:00:00Z', author: agent },
 };
 
 let drafts;
@@ -122,17 +123,22 @@ const normalPaths = [
   ['createConversation', { channelId: 'ch_1', to: 'a@example.com', subject: 's', body: 'b' }, 'ConversationCreateEmail', r => expect(r.id).toBe('cnv_1')],
   ['logConversation', { channelId: 'ch_1', to: 'a@example.com', subject: 's', body: 'b' }, 'ConversationLog', r => expect(r).toMatchObject({ logged: true, sent: false })],
   ['updateConversation', { id: '1', subject: 'New' }, 'ConversationSubject', r => expect(r.id).toBe('cnv_1')],
-  ['deleteConversation', { id: '1' }, 'ConversationDelete', r => expect(r).toBeTruthy()],
-  ['deleteConversationPermanently', { id: '1' }, 'ConversationDelete', r => expect(r).toBeTruthy()],
+  ['deleteConversation', { confirm: true, id: '1' }, 'ConversationDelete', r => expect(r).toBeTruthy()],
+  ['deleteConversationPermanently', { confirm: true, id: '1' }, 'ConversationDelete', r => expect(r).toBeTruthy()],
   ['restoreConversation', { id: '1' }, 'ConversationRestore', r => expect(r).toBeTruthy()],
-  ['markAsSpam', { id: '1' }, 'ConversationSpam', r => expect(r.id).toBe('cnv_1')],
+  ['markAsSpam', { confirm: true, id: '1' }, 'ConversationSpam', r => expect(r.id).toBe('cnv_1')],
   ['forwardConversation', { conversationId: '1', to: ['b@example.com'], body: 'See below' }, 'ConversationForwardV2', r => expect(r).toBeTruthy()],
   ['undoSend', { conversationId: '1', changesetId: 'cs_1' }, 'ConversationUndoSend', r => expect(r).toBeTruthy()],
   ['moveMessageToNewTicket', { messageId: 'msg_1' }, 'ConversationMoveMessage', r => expect(r).toMatchObject({ moved: 'msg_1', newTicket: { id: 'cnv_1', number: 1 } })],
   ['editNote', { messageId: 'msg_1', body: 'Changed' }, 'ConversationEditNote', r => expect(r).toBeTruthy()],
   ['reactToNote', { messageId: 'msg_1', reaction: 'thumbsup' }, 'ConversationToggleNoteReaction', r => expect(r).toBeTruthy()],
-  ['deleteNote', { messageId: 'msg_1' }, 'ConversationDeleteNote', r => expect(r).toMatchObject({ deleted: true })],
-  ['mergeConversations', { sourceId: '2', targetId: '3' }, 'ConversationMerge', r => expect(r).toBeTruthy()],
+  ['deleteNote', { confirm: true, messageId: 'msg_1' }, 'ConversationDeleteNote', r => expect(r).toMatchObject({ deleted: true })],
+  ['deleteNote:preview', { messageId: 'msg_1' }, 'GetNote', r => expect(r).toMatchObject({ deleted: false, wouldDelete: { messageId: 'msg_1', text: 'A note', author: 'agent@example.com' } })],
+  ['deleteConversation:preview', { id: '1' }, 'GetConversation', r => expect(r).toMatchObject({ deleted: false, wouldDelete: { number: 1, subject: 'Hello', contact: 'a@example.com', state: 'OPENED' } })],
+  ['markAsSpam:preview', { id: '1' }, 'GetConversation', r => expect(r).toMatchObject({ spam: false, wouldBlacklist: 'a@example.com' })],
+  ['mergeConversations:preview', { sourceId: '2', targetId: '3' }, 'ListDrafts', r => expect(r).toMatchObject({ merged: false, wouldMerge: { disappears: { number: 1 }, stays: { number: 1 }, draftsDeleted: 0 } })],
+  ['mergeContacts:preview', { source: 'co_2', target: 'co_1' }, 'GetContact', r => expect(r).toMatchObject({ merged: false, wouldMerge: { disappears: { id: 'co_2' }, stays: { id: 'co_1' } } })],
+  ['mergeConversations', { confirm: true, sourceId: '2', targetId: '3' }, 'ConversationMerge', r => expect(r).toBeTruthy()],
   ['closeConversation', { id: '1' }, 'ConversationClose', r => expect(r.id).toBe('cnv_1')],
   ['listMessages', { conversationId: '1' }, 'ListEvents', r => expect(r[0].id).toBe('msg_1')],
   ['getRawEmail', { messageId: 'msg_1' }, 'GetRawEmail', r => expect(r.headers[0]).toEqual({ name: 'From', value: 'a@example.com' })],
@@ -145,7 +151,7 @@ const normalPaths = [
   ['listContacts', {}, 'ListContacts', r => expect(r.contacts[0].id).toBe('co_1')],
   ['listCompanies', {}, 'ListCompanies', r => expect(r).toBeTruthy()],
   ['updateCompany', { id: 'cp_1', name: 'New name' }, 'CustomFieldValuesUpdate', r => expect(r).toBeTruthy()],
-  ['mergeContacts', { source: 'co_2', target: 'co_1' }, 'ContactMerge', r => expect(r).toBeTruthy()],
+  ['mergeContacts', { confirm: true, source: 'co_2', target: 'co_1' }, 'ContactMerge', r => expect(r).toBeTruthy()],
   ['deleteContact', { email: 'a@example.com', confirm: true }, 'ContactDelete', r => expect(r).toMatchObject({ deleted: true })],
   ['getContact', { id: 'co_1' }, 'GetContact', r => expect(r.email).toBe('a@example.com')],
   ['getContactProfile', { contactId: 'co_1' }, 'GetCustomProfile', r => expect(r.profile).toBe('Otys\n- Status: Active\n- Recruiter & owner: Kees')],
@@ -172,11 +178,12 @@ describe('normal path', () => {
     await client.close();
     // getAttachment downloads a file instead of asking Groove's API; tests/attachment-reader.test.mjs covers it
     const testedElsewhere = ['getAttachment'];
-    expect([...normalPaths.map(([name]) => name), ...testedElsewhere].sort()).toEqual(tools.map(tool => tool.name).sort());
+    expect([...new Set(normalPaths.map(([name]) => name.split(':')[0])), ...testedElsewhere].sort()).toEqual(tools.map(tool => tool.name).sort());
   });
 
+  // A name with :preview tests a tool without confirm, which only shows what would happen
   test.each(normalPaths)('%s', async (name, args, operation, check) => {
-    const result = await call(name, args);
+    const result = await call(name.split(':')[0], args);
     expect(result.text).not.toMatch(/"error"/);
     expect(result.isError).toBe(false);
     expect(result.operations).toContain(operation);

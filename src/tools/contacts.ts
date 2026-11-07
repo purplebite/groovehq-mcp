@@ -75,6 +75,7 @@ interface Company {
 interface MergeContactsArgs {
   source: string;
   target: string;
+  confirm?: boolean;
 }
 
 interface DeleteContactArgs {
@@ -427,6 +428,8 @@ export class ContactTools {
     const source = await this.findContact(args.source);
     const target = await this.findContact(args.target);
     if (source.id === target.id) throw new Error('Cannot merge a contact into itself');
+    const summary = (contact: Contact) => ({ id: contact.id, email: contact.email, name: contact.name, tickets: contact.conversationCount });
+    if (args.confirm !== true) return { merged: false, wouldMerge: { disappears: summary(source), stays: summary(target) } };
 
     const payload = await this.client.mutate<{ target: Contact }>(
       mutations.contactMerge,
@@ -628,8 +631,9 @@ export const mergeContacts = defineTool<MergeContactsArgs>({
   name: 'mergeContacts',
   setting: 'merge',
   annotations: DESTRUCTIVE_TOOL,
+  confirm: 'merge these contacts',
   description:
-    'Permanently merge one contact into another, for example a typo address into the right one. This cannot be undone, so always confirm with the user first. ' +
+    'Permanently merge one contact into another, for example a typo address into the right one. This cannot be undone. Without confirm it only shows both contacts: show that to the user first. ' +
     'The source contact and its address disappear. Its tickets move to the target, and its mail then shows the target as sender',
   inputSchema: {
     type: 'object',

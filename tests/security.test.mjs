@@ -1,7 +1,7 @@
 import http from 'node:http';
 import dns from 'node:dns';
 import { spawn } from 'node:child_process';
-import { afterAll, beforeAll, describe, expect, test } from '@jest/globals';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from '@jest/globals';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { createGrooveServer } from '../dist/server.js';
@@ -164,11 +164,11 @@ describe('attachments are off by default', () => {
 
 describe('spam', () => {
   test('markAsSpam marks a ticket', async () => {
-    expect((await call({}, 'markAsSpam', { id: '1' })).mutations).toEqual(['ConversationSpam']);
+    expect((await call({}, 'markAsSpam', { confirm: true, id: '1' })).mutations).toEqual(['ConversationSpam']);
   });
 
   test('markAsSpam is gone in read-only mode', async () => {
-    expect((await call({ readOnly: true }, 'markAsSpam', { id: '1' })).mutations).toEqual([]);
+    expect((await call({ readOnly: true }, 'markAsSpam', { confirm: true, id: '1' })).mutations).toEqual([]);
   });
 
   test.each(['spam', 'SPAM', 'Spam'])('updateConversation refuses state %s', async state => {
@@ -241,13 +241,13 @@ describe('deleting tickets', () => {
   const mode = () => requests.find(request => request.isMutation)?.variables.input.deleteMode;
 
   test('deleteConversation can be restored', async () => {
-    const result = await call({}, 'deleteConversation', { id: '1' });
+    const result = await call({}, 'deleteConversation', { confirm: true, id: '1' });
     expect(result.isError).toBeUndefined();
     expect(mode()).toBe('SOFT');
   });
 
   test.each([true, 'true', 1])('deleteConversation ignores permanent %j', async permanent => {
-    await call({ allowPermanentDelete: true }, 'deleteConversation', { id: '1', permanent });
+    await call({ allowPermanentDelete: true }, 'deleteConversation', { confirm: true, id: '1', permanent });
     expect(mode()).toBe('SOFT');
   });
 
@@ -259,19 +259,19 @@ describe('deleting tickets', () => {
   });
 
   test('deleteConversationPermanently is off by default', async () => {
-    const result = await call({}, 'deleteConversationPermanently', { id: '1' });
+    const result = await call({}, 'deleteConversationPermanently', { confirm: true, id: '1' });
     expect(result.isError).toBe(true);
     expect(result.mutations).toEqual([]);
     expect(result.text).toContain('GROOVE_ALLOW_PERMANENT_DELETE=1');
   });
 
   test('read-only wins over permanent deletion', async () => {
-    const result = await call({ readOnly: true, allowPermanentDelete: true }, 'deleteConversationPermanently', { id: '1' });
+    const result = await call({ readOnly: true, allowPermanentDelete: true }, 'deleteConversationPermanently', { confirm: true, id: '1' });
     expect(result.mutations).toEqual([]);
   });
 
   test('deleteConversationPermanently deletes for good when allowed', async () => {
-    await call({ allowPermanentDelete: true }, 'deleteConversationPermanently', { id: '1' });
+    await call({ allowPermanentDelete: true }, 'deleteConversationPermanently', { confirm: true, id: '1' });
     expect(mode()).toBe('HARD');
   });
 
@@ -345,7 +345,7 @@ describe('boolean arguments', () => {
   });
 
   test.each(['allowDifferentContacts', 'discardDrafts'])('mergeConversations with %s "false" merges nothing', async flag => {
-    const result = await call({}, 'mergeConversations', { sourceId: 'cnv_1', targetId: 'cnv_2', [flag]: 'false' });
+    const result = await call({}, 'mergeConversations', { confirm: true, sourceId: 'cnv_1', targetId: 'cnv_2', [flag]: 'false' });
     expect(result.mutations).toEqual([]);
   });
 });
@@ -359,7 +359,7 @@ describe('merging tickets without contacts', () => {
         return { data: { node: { id: `cnv_${reads}`, number: reads, contact: reads === 1 ? source : target, channel: { id: 'ch_1' } } } };
       }
     };
-    const result = await call({}, 'mergeConversations', { sourceId: 'cnv_1', targetId: 'cnv_2', ...args });
+    const result = await call({}, 'mergeConversations', { confirm: true, sourceId: 'cnv_1', targetId: 'cnv_2', ...args });
     call.answer = undefined;
     return result;
   };
@@ -746,5 +746,57 @@ describe('attachment links by where their name points', () => {
       await expect(attempt('https://worker.example/a')).rejects.toThrow("can't be resolved");
       expect(fetched).toEqual([]);
     });
+  });
+});
+
+describe('tools that only run with confirm', () => {
+  const everything = { allowMerge: true, allowPermanentDelete: true };
+  const asking = [
+    ['deleteConversation', { id: '1' }, 'wouldDelete'],
+    ['deleteConversationPermanently', { id: '1' }, 'wouldDelete'],
+    ['markAsSpam', { id: '1' }, 'wouldBlacklist'],
+    ['mergeConversations', { sourceId: 'cnv_1', targetId: 'cnv_2' }, 'wouldMerge'],
+    ['mergeContacts', { source: 'co_2', target: 'co_1' }, 'wouldMerge'],
+    ['deleteNote', { messageId: 'msg_1' }, 'wouldDelete'],
+  ];
+
+  // The fake answers every node query with one ticket; notes and two different contacts need their own answers
+  let reads = 0;
+  const lookups = query => {
+    if (query.includes('GetNote')) return { data: { node: { id: 'msg_1', isNote: true, bodyPlainText: 'A note', createdAt: '2020-01-01T00:00:00Z', author: { email: 'a@example.com' } } } };
+    if (query.includes('GetContact')) return { data: { node: { ...contact, id: `co_${++reads}` } } };
+    return undefined;
+  };
+  beforeEach(() => { reads = 0; call.answer = lookups; });
+  afterEach(() => { call.answer = undefined; });
+
+  test.each(asking)('%s only shows what would happen without confirm', async (name, args, field) => {
+    const result = await call(everything, name, args);
+    expect(result.isError).toBeUndefined();
+    expect(result.mutations).toEqual([]);
+    expect(JSON.parse(result.text)[field]).toBeDefined();
+  });
+
+  test.each(asking)('%s refuses confirm as text', async (name, args) => {
+    const result = await call(everything, name, { ...args, confirm: 'true' });
+    expect(result.isError).toBe(true);
+    expect(result.mutations).toEqual([]);
+  });
+
+  test.each(asking)('%s runs with confirm true', async (name, args) => {
+    const result = await call(everything, name, { ...args, confirm: true });
+    expect(result.isError).toBeUndefined();
+  });
+
+  test('the tools that ask list the confirm field, and sending does not', async () => {
+    const client = await connect({ ...everything, allowSend: true });
+    const { tools } = await client.listTools();
+    for (const [name] of asking) {
+      expect(tools.find(tool => tool.name === name).inputSchema.properties.confirm).toMatchObject({ type: 'boolean' });
+    }
+    for (const name of ['sendMessage', 'createConversation', 'forwardConversation', 'closeConversation']) {
+      expect(tools.find(tool => tool.name === name).inputSchema.properties.confirm).toBeUndefined();
+    }
+    await client.close();
   });
 });

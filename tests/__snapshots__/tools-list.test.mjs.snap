@@ -2886,12 +2886,17 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
     },
     "deleteConversation": {
       "annotations": {
-        "destructiveHint": false,
+        "destructiveHint": true,
         "readOnlyHint": false,
       },
-      "description": "Delete a ticket. restoreConversation brings it back with its messages and notes.",
+      "description": "Delete a ticket. It goes to the trash, and restoreConversation brings it back with its messages and notes. Without confirm it only shows which ticket would go: show that to the user first.",
       "inputSchema": {
         "properties": {
+          "confirm": {
+            "default": false,
+            "description": "Really delete this ticket. Without it the tool only shows what would happen. Pass true only after the user agreed",
+            "type": "boolean",
+          },
           "id": {
             "description": "Ticket number (e.g. 12345) or conversation ID",
             "type": "string",
@@ -2909,9 +2914,14 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
         "destructiveHint": true,
         "readOnlyHint": false,
       },
-      "description": "Delete a ticket for good. This cannot be undone, so always confirm with the user first.",
+      "description": "Delete a ticket for good. This cannot be undone. Without confirm it only shows which ticket would go: show that to the user first.",
       "inputSchema": {
         "properties": {
+          "confirm": {
+            "default": false,
+            "description": "Really delete this ticket for good. Without it the tool only shows what would happen. Pass true only after the user agreed",
+            "type": "boolean",
+          },
           "id": {
             "description": "Ticket number (e.g. 12345) or conversation ID",
             "type": "string",
@@ -2954,9 +2964,14 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
         "destructiveHint": true,
         "readOnlyHint": false,
       },
-      "description": "Delete an internal note. Confirm with the user first.",
+      "description": "Delete an internal note. Without confirm it only shows the note that would go: show that to the user first.",
       "inputSchema": {
         "properties": {
+          "confirm": {
+            "default": false,
+            "description": "Really delete this note. Without it the tool only shows what would happen. Pass true only after the user agreed",
+            "type": "boolean",
+          },
           "messageId": {
             "description": "ID of the note",
             "type": "string",
@@ -4148,9 +4163,14 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
         "destructiveHint": true,
         "readOnlyHint": false,
       },
-      "description": "Mark a ticket as spam. Groove also blacklists the sender, so their future mail to any mailbox is marked as spam too. Always confirm with the user first. restoreConversation brings the ticket back, but the blacklist can only be undone in the Groove settings.",
+      "description": "Mark a ticket as spam. Groove also blacklists the sender, so their future mail to any mailbox is marked as spam too. Without confirm it only shows the ticket and the address that would be blacklisted: show that to the user first. restoreConversation brings the ticket back, but the blacklist can only be undone in the Groove settings.",
       "inputSchema": {
         "properties": {
+          "confirm": {
+            "default": false,
+            "description": "Really mark this ticket as spam and blacklist its sender. Without it the tool only shows what would happen. Pass true only after the user agreed",
+            "type": "boolean",
+          },
           "id": {
             "description": "Ticket number (e.g. 12345) or conversation ID",
             "type": "string",
@@ -4168,9 +4188,14 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
         "destructiveHint": true,
         "readOnlyHint": false,
       },
-      "description": "Permanently merge one contact into another, for example a typo address into the right one. This cannot be undone, so always confirm with the user first. The source contact and its address disappear. Its tickets move to the target, and its mail then shows the target as sender",
+      "description": "Permanently merge one contact into another, for example a typo address into the right one. This cannot be undone. Without confirm it only shows both contacts: show that to the user first. The source contact and its address disappear. Its tickets move to the target, and its mail then shows the target as sender",
       "inputSchema": {
         "properties": {
+          "confirm": {
+            "default": false,
+            "description": "Really merge these contacts. Without it the tool only shows what would happen. Pass true only after the user agreed",
+            "type": "boolean",
+          },
           "source": {
             "description": "Contact that disappears: exact email address or contact ID",
             "type": "string",
@@ -4193,11 +4218,16 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
         "destructiveHint": true,
         "readOnlyHint": false,
       },
-      "description": "Permanently merge one ticket into another. This cannot be undone, so always confirm with the user first. The source ticket disappears. The target keeps its contact, subject and assignee. Replies and notes move over and tags are combined. Drafts on the source are deleted, and an open source reopens the target",
+      "description": "Permanently merge one ticket into another. This cannot be undone. Without confirm it only shows both tickets and which one would disappear: show that to the user first. The source ticket disappears. The target keeps its contact, subject and assignee. Replies and notes move over and tags are combined. Drafts on the source are deleted, and an open source reopens the target",
       "inputSchema": {
         "properties": {
           "allowDifferentContacts": {
             "description": "Merge even though the tickets have different contacts. Only after the user agreed",
+            "type": "boolean",
+          },
+          "confirm": {
+            "default": false,
+            "description": "Really merge these tickets. Without it the tool only shows what would happen. Pass true only after the user agreed",
             "type": "boolean",
           },
           "discardDrafts": {

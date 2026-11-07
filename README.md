@@ -189,15 +189,15 @@ This server can send real email to real customers. A few things limit what can g
 - **Acting as a colleague is checked.** With `authorId`, the server first checks that the colleague exists and is active, because Groove would otherwise quietly use the token's owner.
 - **Links carry a risk.** With attachments on, the server fetches links itself, so a model misled by a customer email could put ticket data in a link to an outside server. Only `https` links are fetched, and the server refuses a name that points to a private address, also after a redirect. The download looks the name up again, so a name that changes in between (DNS rebinding) can still get through. Where Node's `dns` module is missing, as in a Cloudflare Worker, only the address itself is checked.
 - **Attachments can contain instructions.** Text in a file comes from whoever sent it, just like an email. `getAttachment` only reads Groove's own download links and never sends your token. Anyone with such a link can download the file, so treat the links like the files.
-- **Spam reaches past one ticket.** Groove blacklists the sender, so their future mail to any mailbox is spam too, until you remove the address in Groove's settings. That's why `markAsSpam` is a separate tool marked as destructive, so your client can ask first.
-- **Merging is permanent.** Only the target ticket stays. `mergeConversations` refuses tickets with different contacts unless told otherwise.
-- **Deleting is limited.** A deleted ticket can always be restored, and deleting one for good needs its own setting. A deleted contact is gone for good, so contacts with tickets can't be deleted at all: merge them first. Other contacts are only deleted with `confirm: true`.
+- **Spam reaches past one ticket.** Groove blacklists the sender, so their future mail to any mailbox is spam too, until you remove the address in Groove's settings. That's why `markAsSpam` first shows the ticket and the address, and only runs with `confirm: true`.
+- **Merging is permanent.** Only the target ticket stays. `mergeConversations` and `mergeContacts` first show both sides and only run with `confirm: true`; `mergeConversations` also refuses tickets with different contacts unless told otherwise.
+- **Deleting shows first.** Deleting a ticket, a contact or a note first shows what would go, and only runs with `confirm: true`. A deleted ticket goes to the trash and can be restored; deleting one for good needs its own setting. A deleted contact is gone for good, so contacts with tickets can't be deleted at all: merge them first.
 - **Moves keep access.** `updateConversation` won't move a ticket to a mailbox your token can't reach, because you couldn't read it or move it back. The model may only override this after asking you.
 - **Updates can stop halfway.** Groove has no all-or-nothing update. If `updateConversation` fails partway, the error says which steps already went through.
 
 Sending a draft from Groove may close the ticket, depending on your Groove settings.
 
-Your MCP client will usually ask before a tool runs. Every tool is labeled as read, additive, or destructive, so clients like claude.ai can set approval per group. Tools that send mail count as destructive, and it's a good idea to keep asking for those.
+Your MCP client will usually ask before a tool runs. Every tool is labeled as read, additive, or destructive, so clients like claude.ai can set approval per group. Tools that send mail are destructive too, and only exist with `GROOVE_ALLOW_SEND=1`; whether your client asks before each send is your client's setting.
 
 ## Good to know
 

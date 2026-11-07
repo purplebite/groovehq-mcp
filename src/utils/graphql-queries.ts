@@ -300,6 +300,29 @@ export const queries = {
     }
   `,
 
+  getNote: `
+    query GetNote($id: ID!) {
+      node(id: $id) {
+        ... on Message {
+          id
+          isNote
+          bodyPlainText
+          createdAt
+          author {
+            ... on Agent {
+              name
+              email
+            }
+            ... on Contact {
+              name
+              email
+            }
+          }
+        }
+      }
+    }
+  `,
+
   getTicketNode: `
     query GetTicketNode($id: ID!) {
       node(id: $id) {

@@ -167,9 +167,9 @@ if (ticketsOnly) {
   });
 
   await test('spam, delete and restore change the state', async () => {
-    expect((await call('markAsSpam', { id })).state === 'SPAM', 'not spam');
+    expect((await call('markAsSpam', { confirm: true, id })).state === 'SPAM', 'not spam');
     expect((await call('restoreConversation', { id })).state === 'OPENED', 'not restored');
-    await call('deleteConversation', { id });
+    await call('deleteConversation', { confirm: true, id });
     expect((await read()).state !== 'OPENED', 'not deleted');
     expect((await call('restoreConversation', { id })).state === 'OPENED', 'not restored');
   });
@@ -181,7 +181,7 @@ if (ticketsOnly) {
     expect((await call('reactToNote', { messageId: note.id, reaction: '👍' })).toggled, 'no reaction');
     const edited = (await call('listMessages', { conversationId: id })).find(row => row.id === note.id);
     expect(edited.bodyPlainText.includes(`Edited ${stamp}`), 'not edited');
-    expect((await call('deleteNote', { messageId: note.id })).deleted, 'not deleted');
+    expect((await call('deleteNote', { confirm: true, messageId: note.id })).deleted, 'not deleted');
   });
 
   await test('a mail can be undone right after sending', async () => {
@@ -203,9 +203,9 @@ if (ticketsOnly) {
   await test('deleteConversation can be restored unless permanent', async () => {
     const other = await log('B');
     const otherId = String(other.number);
-    expect((await call('deleteConversation', { id: otherId })).deleted, 'not deleted');
+    expect((await call('deleteConversation', { confirm: true, id: otherId })).deleted, 'not deleted');
     expect((await call('restoreConversation', { id: otherId })).state === 'OPENED', 'not restored');
-    expect((await call('deleteConversationPermanently', { id: otherId })).permanent, 'not permanent');
+    expect((await call('deleteConversationPermanently', { confirm: true, id: otherId })).permanent, 'not permanent');
     expect(await fails('getConversation', { id: otherId }), 'still there');
   });
 
@@ -274,8 +274,7 @@ if (ticketsOnly) {
   });
 
   await test('createConversation sends a file', async () => {
-    const created = await call('createConversation', {
-      channelId: GROOVE_TEST_CHANNEL,
+    const created = await call('createConversation', { channelId: GROOVE_TEST_CHANNEL,
       to: `${local}+newfile@${domain}`,
       subject: '[TEST] groovehq-mcp new ticket with a file',
       body: 'Automated new ticket with a file.',
@@ -295,8 +294,7 @@ if (ticketsOnly) {
   const others = agents.filter(agent => agent.state === 'ACTIVE' && agent.id !== me);
   const author = others[Math.floor(Math.random() * others.length)];
   const send = (name, args = {}) =>
-    call('createConversation', {
-      channelId: GROOVE_TEST_CHANNEL,
+    call('createConversation', { channelId: GROOVE_TEST_CHANNEL,
       to: `${local}+${name}${stamp}@${domain}`,
       subject: `[TEST] groovehq-mcp ${name}`,
       body: 'Automated groovehq-mcp test. Feel free to ignore.',
@@ -448,8 +446,8 @@ if (contactsOnly) {
   await test('mergeContacts removes the source and keeps the target', async () => {
     const source = await create('c');
     const target = await create('d');
-    expect(await fails('mergeContacts', { source: source.email, target: source.id }), 'merged into itself');
-    const result = await call('mergeContacts', { source: source.email, target: target.id });
+    expect(await fails('mergeContacts', { confirm: true, source: source.email, target: source.id }), 'merged into itself');
+    const result = await call('mergeContacts', { confirm: true, source: source.email, target: target.id });
     expect(result.merged && result.contact.id === target.id, 'wrong result');
     expect((await settles(source.email, false)) && (await exists(target.email)), 'wrong contact left');
     await call('deleteContact', { email: target.email, confirm: true });
@@ -872,8 +870,7 @@ if (write) {
       mail.cc.nodes.some(row => row.email === cc) && mail.bcc.nodes.some(row => row.email === bcc);
 
     await test('createConversation sends a mail', async () => {
-      const created = await call('createConversation', {
-        channelId: GROOVE_TEST_CHANNEL,
+      const created = await call('createConversation', { channelId: GROOVE_TEST_CHANNEL,
         to: GROOVE_TEST_TO,
         subject: '[TEST] groovehq-mcp live test',
         body: 'Automated groovehq-mcp test. Feel free to ignore.',
@@ -913,8 +910,7 @@ if (write) {
 
     if (number) {
       await test('sendMessage sends a reply', async () => {
-        const reply = await call('sendMessage', {
-          conversationId: number,
+        const reply = await call('sendMessage', { conversationId: number,
           to: GROOVE_TEST_TO,
           body: 'Automated groovehq-mcp test reply.',
           cc: [cc],
@@ -963,8 +959,7 @@ if (merge) {
     console.log('\nMerging');
     const [name, domain] = GROOVE_TEST_TO.split('@');
     const create = (to, letter) =>
-      call('createConversation', {
-        channelId: GROOVE_TEST_CHANNEL,
+      call('createConversation', { channelId: GROOVE_TEST_CHANNEL,
         to,
         subject: `[TEST] groovehq-mcp merge test ${letter}`,
         body: 'Automated groovehq-mcp merge test. Feel free to ignore.',
@@ -973,7 +968,7 @@ if (merge) {
     // Groove refuses to merge while a new mail is still waiting to go out
     const mergeWhenSent = async args => {
       for (let tries = 0; ; tries++) {
-        const message = await fails('mergeConversations', args);
+        const message = await fails('mergeConversations', { confirm: true, ...args });
         if (!message) return;
         if (!message.includes('waiting to be sent') || tries === 24) throw new Error(message);
         await new Promise(resolve => setTimeout(resolve, 5000));
@@ -994,18 +989,18 @@ if (merge) {
     });
 
     await test('a ticket cannot be merged into itself', async () => {
-      expect(await fails('mergeConversations', { sourceId: source, targetId: source }), 'merged into itself');
+      expect(await fails('mergeConversations', { confirm: true, sourceId: source, targetId: source }), 'merged into itself');
     });
 
     await test('different contacts are refused and nothing changes', async () => {
-      const message = await fails('mergeConversations', { sourceId: foreign, targetId: target });
+      const message = await fails('mergeConversations', { confirm: true, sourceId: foreign, targetId: target });
       expect(message?.includes('allowDifferentContacts'), 'not refused');
       expect((await call('getConversation', { id: foreign })).state === other.state, 'source changed');
     });
 
     await test('a draft on the source is refused and kept', async () => {
       const draft = await call('createReplyDraft', { conversationId: source, body: 'Merge test draft.' });
-      const message = await fails('mergeConversations', { sourceId: source, targetId: target });
+      const message = await fails('mergeConversations', { confirm: true, sourceId: source, targetId: target });
       expect(message?.includes('discardDrafts'), 'not refused');
       expect((await call('listDrafts', { conversationId: source })).some(row => row.draftId === draft.draftId), 'draft gone');
     });
