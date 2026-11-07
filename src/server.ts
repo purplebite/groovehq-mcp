@@ -246,7 +246,7 @@ export function createGrooveServer(opts: GrooveServerOptions): Server {
     // Added here, so every tool that asks has the same field and the same check
     const confirm = {
       type: 'boolean',
-      description: `Really ${tool.confirm}. Without it the tool only shows what would happen. Pass true only after the user agreed`,
+      description: `Really ${tool.confirm}. Without it the tool does nothing but say what would happen. Pass true only after the user agreed`,
       default: false,
     };
     return { ...schema, properties: { ...schema.properties, confirm } };

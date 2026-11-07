@@ -2323,6 +2323,11 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
             "description": "ID of the channel to send from",
             "type": "string",
           },
+          "confirm": {
+            "default": false,
+            "description": "Really send this mail to more than 5 people. Without it the tool does nothing but say what would happen. Pass true only after the user agreed",
+            "type": "boolean",
+          },
           "snoozedUntil": {
             "description": "ISO 8601 datetime to snooze until. Needs state snoozed. Leave out to snooze indefinitely",
             "type": "string",
@@ -2408,6 +2413,11 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
           "channelId": {
             "description": "ID of the channel to send from",
             "type": "string",
+          },
+          "confirm": {
+            "default": false,
+            "description": "Really send this mail to more than 5 people. Without it the tool does nothing but say what would happen. Pass true only after the user agreed",
+            "type": "boolean",
           },
           "snoozedUntil": {
             "description": "ISO 8601 datetime to snooze until. Needs state snoozed. Leave out to snooze indefinitely",
@@ -2518,6 +2528,11 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
           "channelId": {
             "description": "ID of the channel to send from",
             "type": "string",
+          },
+          "confirm": {
+            "default": false,
+            "description": "Really send this mail to more than 5 people. Without it the tool does nothing but say what would happen. Pass true only after the user agreed",
+            "type": "boolean",
           },
           "snoozedUntil": {
             "description": "ISO 8601 datetime to snooze until. Needs state snoozed. Leave out to snooze indefinitely",
@@ -2632,6 +2647,11 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
           "channelId": {
             "description": "ID of the channel to send from",
             "type": "string",
+          },
+          "confirm": {
+            "default": false,
+            "description": "Really send this mail to more than 5 people. Without it the tool does nothing but say what would happen. Pass true only after the user agreed",
+            "type": "boolean",
           },
           "snoozedUntil": {
             "description": "ISO 8601 datetime to snooze until. Needs state snoozed. Leave out to snooze indefinitely",
@@ -2958,7 +2978,7 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
         "properties": {
           "confirm": {
             "default": false,
-            "description": "Really delete this ticket. Without it the tool only shows what would happen. Pass true only after the user agreed",
+            "description": "Really delete this ticket. Without it the tool does nothing but say what would happen. Pass true only after the user agreed",
             "type": "boolean",
           },
           "id": {
@@ -2983,7 +3003,7 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
         "properties": {
           "confirm": {
             "default": false,
-            "description": "Really delete this ticket for good. Without it the tool only shows what would happen. Pass true only after the user agreed",
+            "description": "Really delete this ticket for good. Without it the tool does nothing but say what would happen. Pass true only after the user agreed",
             "type": "boolean",
           },
           "id": {
@@ -3033,7 +3053,7 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
         "properties": {
           "confirm": {
             "default": false,
-            "description": "Really delete this note. Without it the tool only shows what would happen. Pass true only after the user agreed",
+            "description": "Really delete this note. Without it the tool does nothing but say what would happen. Pass true only after the user agreed",
             "type": "boolean",
           },
           "messageId": {
@@ -3098,6 +3118,11 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
               "type": "string",
             },
             "type": "array",
+          },
+          "confirm": {
+            "default": false,
+            "description": "Really send this mail to more than 5 people. Without it the tool does nothing but say what would happen. Pass true only after the user agreed",
+            "type": "boolean",
           },
           "conversationId": {
             "description": "Ticket number (e.g. 12345) or conversation ID",
@@ -3177,6 +3202,11 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
               "type": "string",
             },
             "type": "array",
+          },
+          "confirm": {
+            "default": false,
+            "description": "Really send this mail to more than 5 people. Without it the tool does nothing but say what would happen. Pass true only after the user agreed",
+            "type": "boolean",
           },
           "conversationId": {
             "description": "Ticket number (e.g. 12345) or conversation ID",
@@ -4393,7 +4423,7 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
         "properties": {
           "confirm": {
             "default": false,
-            "description": "Really mark this ticket as spam and blacklist its sender. Without it the tool only shows what would happen. Pass true only after the user agreed",
+            "description": "Really mark this ticket as spam and blacklist its sender. Without it the tool does nothing but say what would happen. Pass true only after the user agreed",
             "type": "boolean",
           },
           "id": {
@@ -4418,7 +4448,7 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
         "properties": {
           "confirm": {
             "default": false,
-            "description": "Really merge these contacts. Without it the tool only shows what would happen. Pass true only after the user agreed",
+            "description": "Really merge these contacts. Without it the tool does nothing but say what would happen. Pass true only after the user agreed",
             "type": "boolean",
           },
           "source": {
@@ -4452,7 +4482,7 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
           },
           "confirm": {
             "default": false,
-            "description": "Really merge these tickets. Without it the tool only shows what would happen. Pass true only after the user agreed",
+            "description": "Really merge these tickets. Without it the tool does nothing but say what would happen. Pass true only after the user agreed",
             "type": "boolean",
           },
           "discardDrafts": {
@@ -4595,6 +4625,11 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
             },
             "type": "array",
           },
+          "confirm": {
+            "default": false,
+            "description": "Really send this mail to more than 5 people. Without it the tool does nothing but say what would happen. Pass true only after the user agreed",
+            "type": "boolean",
+          },
           "conversationId": {
             "description": "Ticket number (e.g. 12345) or conversation ID",
             "type": "string",
@@ -4642,6 +4677,11 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
               "type": "string",
             },
             "type": "array",
+          },
+          "confirm": {
+            "default": false,
+            "description": "Really send this mail to more than 5 people. Without it the tool does nothing but say what would happen. Pass true only after the user agreed",
+            "type": "boolean",
           },
           "conversationId": {
             "description": "Ticket number (e.g. 12345) or conversation ID",
@@ -4714,6 +4754,11 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
               "type": "string",
             },
             "type": "array",
+          },
+          "confirm": {
+            "default": false,
+            "description": "Really send this mail to more than 5 people. Without it the tool does nothing but say what would happen. Pass true only after the user agreed",
+            "type": "boolean",
           },
           "conversationId": {
             "description": "Ticket number (e.g. 12345) or conversation ID",
@@ -4790,6 +4835,11 @@ exports[`tools/list is unchanged for all 64 option combinations 1`] = `
               "type": "string",
             },
             "type": "array",
+          },
+          "confirm": {
+            "default": false,
+            "description": "Really send this mail to more than 5 people. Without it the tool does nothing but say what would happen. Pass true only after the user agreed",
+            "type": "boolean",
           },
           "conversationId": {
             "description": "Ticket number (e.g. 12345) or conversation ID",

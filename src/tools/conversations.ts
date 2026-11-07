@@ -5,6 +5,7 @@ import { Conversation } from '../types/groove.js';
 import { AgentTools } from './agents.js';
 import { DraftTools } from './drafts.js';
 import { AttachmentArg, uploadAttachments } from './attachments.js';
+import { checkRecipients, RECIPIENTS_CONFIRM } from './recipients.js';
 import { pageGuard } from '../utils/paging.js';
 import { defineTool, ADDITIVE_TOOL, DESTRUCTIVE_TOOL, READ_TOOL } from './definition.js';
 
@@ -107,6 +108,7 @@ interface CreateConversationArgs {
   authorId?: string;
   state?: 'opened' | 'closed' | 'snoozed';
   snoozedUntil?: string;
+  confirm?: boolean;
 }
 
 interface LogConversationArgs {
@@ -135,6 +137,7 @@ interface ForwardConversationArgs {
   cc?: string[];
   bcc?: string[];
   attachments?: AttachmentArg[];
+  confirm?: boolean;
 }
 
 interface ConfirmedTicketArgs {
@@ -249,6 +252,7 @@ export class ConversationTools {
   }
 
   async createConversation(args: CreateConversationArgs): Promise<Conversation> {
+    checkRecipients(args);
     if (args.snoozedUntil && args.state !== 'snoozed') {
       throw new Error('snoozedUntil needs state snoozed');
     }
@@ -563,6 +567,7 @@ export class ConversationTools {
   }
 
   async forwardConversation(args: ForwardConversationArgs) {
+    checkRecipients(args);
     const conversationId = await this.client.resolveConversationId(args.conversationId);
     const ticket = await this.getConversation(conversationId);
     if (!ticket) throw new Error(`Ticket not found: ${args.conversationId}`);
@@ -821,6 +826,7 @@ export const createConversation = defineTool<CreateConversationArgs>({
   name: 'createConversation',
   setting: 'send',
   annotations: DESTRUCTIVE_TOOL,
+  confirm: RECIPIENTS_CONFIRM,
   description: 'SENDS AN EMAIL IMMEDIATELY to the given address and creates a ticket. Use only when the user explicitly asks to send this message.',
   inputSchema: ({ authorField, attachmentsField }) => ({
     type: 'object',
@@ -1178,6 +1184,7 @@ export const forwardConversation = defineTool<ForwardConversationArgs>({
   name: 'forwardConversation',
   setting: 'send',
   annotations: DESTRUCTIVE_TOOL,
+  confirm: RECIPIENTS_CONFIRM,
   description:
     'SENDS AN EMAIL IMMEDIATELY: forwards a ticket to the given addresses. The ticket keeps its state, and only gets a new subject if you pass one. Use only when the user explicitly asks.',
   inputSchema: ({ attachmentsField }) => ({

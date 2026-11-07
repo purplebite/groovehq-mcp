@@ -4,6 +4,7 @@ import { pageGuard } from '../utils/paging.js';
 import { Conversation, Message } from '../types/groove.js';
 import { AgentTools } from './agents.js';
 import { AttachmentArg, uploadAttachments } from './attachments.js';
+import { checkRecipients, RECIPIENTS_CONFIRM } from './recipients.js';
 import { defineTool, ADDITIVE_TOOL, DESTRUCTIVE_TOOL, READ_TOOL } from './definition.js';
 
 const MAX_RAW_CHARS = 100000;
@@ -23,6 +24,7 @@ interface SendMessageArgs {
   bcc?: string[];
   attachments?: AttachmentArg[];
   authorId?: string;
+  confirm?: boolean;
 }
 
 interface CreateNoteArgs {
@@ -112,6 +114,7 @@ export class MessageTools {
   }
 
   async sendMessage(args: SendMessageArgs) {
+    checkRecipients(args);
     const conversationId = await this.client.resolveConversationId(args.conversationId);
     let channelId: string | undefined;
     if (args.authorId != null) {
@@ -383,6 +386,7 @@ export const sendMessage = defineTool<SendMessageArgs>({
   name: 'sendMessage',
   setting: 'send',
   annotations: DESTRUCTIVE_TOOL,
+  confirm: RECIPIENTS_CONFIRM,
   description: 'SENDS AN EMAIL IMMEDIATELY as a reply on a ticket. Use only when the user explicitly asks to send this message; to prepare a reply for review, use createReplyDraft. Returns the ticket and the reply as Groove stored it.',
   inputSchema: ({ authorField, attachmentsField }) => ({
     type: 'object',

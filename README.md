@@ -188,6 +188,7 @@ The library doesn't read the `GROOVE_` settings, so pass each option yourself. I
 This server can send real email to real customers. A few things limit what can go wrong:
 
 - **Recipients are always explicit.** Mail only goes to the `to`, `cc` and `bcc` you give. Nothing goes to a default.
+- **A mail to many people asks first.** More than 5 recipients in one mail needs `confirm: true`; more than 50 is refused.
 - **Acting as a colleague is checked.** With `authorId`, the server first checks that the colleague exists and is active, because Groove would otherwise quietly use the token's owner.
 - **Links carry a risk.** With attachments on, the server fetches links itself, so a model misled by a customer email could put ticket data in a link to an outside server. Only `https` links are fetched, and the server refuses a name that points to a private address, also after a redirect. The download looks the name up again, so a name that changes in between (DNS rebinding) can still get through. Where Node's `dns` module is missing, as in a Cloudflare Worker, only the address itself is checked.
 - **Attachments can contain instructions.** Text in a file comes from whoever sent it, just like an email. `getAttachment` only reads Groove's own download links and never sends your token. Anyone with such a link can download the file, so treat the links like the files.

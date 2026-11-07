@@ -794,9 +794,42 @@ describe('tools that only run with confirm', () => {
     for (const [name] of asking) {
       expect(tools.find(tool => tool.name === name).inputSchema.properties.confirm).toMatchObject({ type: 'boolean' });
     }
-    for (const name of ['sendMessage', 'createConversation', 'forwardConversation', 'closeConversation']) {
-      expect(tools.find(tool => tool.name === name).inputSchema.properties.confirm).toBeUndefined();
-    }
+    expect(tools.find(tool => tool.name === 'closeConversation').inputSchema.properties.confirm).toBeUndefined();
+    expect(tools.find(tool => tool.name === 'sendMessage').inputSchema.properties.confirm.description).toContain('more than 5 people');
     await client.close();
+  });
+});
+
+describe('a mail to many people', () => {
+  const many = count => Array.from({ length: count }, (_, index) => `person${index}@example.com`);
+  const send = (bcc, extra = {}) => call({ allowSend: true }, 'sendMessage', { conversationId: '1', to: 'a@example.com', body: 'b', bcc, ...extra });
+
+  test('up to 5 recipients go out without a question', async () => {
+    expect((await send(many(4))).mutations).toEqual(['ConversationReply']);
+  });
+
+  test('more than 5 recipients need confirm', async () => {
+    const result = await send(many(5));
+    expect(result.isError).toBe(true);
+    expect(result.mutations).toEqual([]);
+    expect(result.text).toContain('6 people');
+    expect((await send(many(5), { confirm: true })).mutations).toEqual(['ConversationReply']);
+  });
+
+  test('more than 50 recipients are refused, also with confirm', async () => {
+    const result = await send(many(50), { confirm: true });
+    expect(result.isError).toBe(true);
+    expect(result.mutations).toEqual([]);
+    expect(result.text).toContain('Split it up');
+  });
+
+  test('createConversation and forwardConversation count the same way', async () => {
+    const created = await call({ allowSend: true }, 'createConversation', { channelId: 'ch_1', to: 'a@example.com', subject: 's', body: 'b', cc: many(5) });
+    expect(created.isError).toBe(true);
+    expect(created.mutations).toEqual([]);
+    const forwarded = await call({ allowSend: true }, 'forwardConversation', { conversationId: '1', to: many(6), body: 'b' });
+    expect(forwarded.isError).toBe(true);
+    expect(forwarded.mutations).toEqual([]);
+    expect((await call({ allowSend: true }, 'forwardConversation', { conversationId: '1', to: many(6), body: 'b', confirm: true })).mutations).toEqual(['ConversationForwardV2']);
   });
 });
