@@ -321,6 +321,23 @@ describe('safety options', () => {
     expect(stderr).toContain(`${name} must be 1 or 0`);
   });
 
+  test.each([
+    ['http://api.groovehq.com/v2/graphql', 'must start with https://'],
+    ['https://user:secret@api.groovehq.com/v2/graphql', 'must not contain a username or password'],
+    ['not a url', 'not a valid URL'],
+  ])('GROOVE_API_URL=%s stops the server', async (value, message) => {
+    const { code, stderr } = await start({ GROOVE_API_URL: value });
+    expect(code).toBe(1);
+    expect(stderr).toContain(message);
+  });
+
+  test('the library refuses the same addresses', () => {
+    expect(() => createGrooveServer({ token: TOKEN, apiUrl: 'http://api.groovehq.com/v2/graphql' })).toThrow('https://');
+    expect(() => createGrooveServer({ token: TOKEN, apiUrl: 'https://u:p@api.groovehq.com/v2/graphql' })).toThrow('username or password');
+    expect(() => createGrooveServer({ token: TOKEN, apiUrl: 'https://api.groovehq.com/v2/graphql' })).not.toThrow();
+    expect(() => createGrooveServer({ token: TOKEN, apiUrl: 'http://127.0.0.1:1/graphql' })).not.toThrow();
+  });
+
   test('no GROOVE_API_TOKEN stops the server', async () => {
     const { code, stderr } = await start({ GROOVE_API_TOKEN: '' });
     expect(code).toBe(1);

@@ -1,12 +1,19 @@
 #!/usr/bin/env node
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
-import { createGrooveServer, GrooveClient } from './server.js';
+import { createGrooveServer, GrooveClient, checkApiUrl } from './server.js';
 
 const apiToken = process.env.GROOVE_API_TOKEN;
 const apiUrl = process.env.GROOVE_API_URL || 'https://api.groovehq.com/v2/graphql';
 
 if (!apiToken) {
   console.error('Error: GROOVE_API_TOKEN environment variable is required');
+  process.exit(1);
+}
+
+try {
+  checkApiUrl(apiUrl);
+} catch (error) {
+  console.error(`Error: ${error instanceof Error ? error.message : error}`);
   process.exit(1);
 }
 

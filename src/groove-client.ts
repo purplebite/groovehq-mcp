@@ -2,6 +2,24 @@ import { GraphQLClient, Variables } from 'graphql-request';
 import { GraphQLError } from './types/groove.js';
 import { queries } from './utils/graphql-queries.js';
 
+// The token goes out with every request, so the address must be https and carry no credentials of its own.
+// Plain http is only allowed to this machine, for a local stand-in for Groove
+export function checkApiUrl(apiUrl: string): void {
+  let url: URL;
+  try {
+    url = new URL(apiUrl);
+  } catch {
+    throw new Error(`Groove API address is not a valid URL: ${apiUrl}`);
+  }
+  const local = ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname);
+  if (url.protocol !== 'https:' && !(url.protocol === 'http:' && local)) {
+    throw new Error(`Groove API address must start with https://, got ${url.protocol}// (the token would go out unencrypted)`);
+  }
+  if (url.username || url.password) {
+    throw new Error('Groove API address must not contain a username or password');
+  }
+}
+
 export class GrooveClient {
   private client: GraphQLClient;
   private apiToken: string;
@@ -10,6 +28,7 @@ export class GrooveClient {
     if (!apiToken) {
       throw new Error('Groove API token is required');
     }
+    checkApiUrl(apiUrl);
 
     this.apiToken = apiToken;
     this.client = new GraphQLClient(apiUrl, {

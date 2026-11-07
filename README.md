@@ -107,7 +107,7 @@ Using a different MCP client? Have it run `npx -y groovehq-mcp` and set `GROOVE_
 | `GROOVE_ALLOW_PERMANENT_DELETE` | `0` | `1` adds `deleteConversationPermanently` |
 | `GROOVE_ALLOW_ATTACHMENTS` | `0` | `1` lets mail and notes carry files, from a link or as base64 |
 | `GROOVE_READ_ATTACHMENTS` | `1` | `0` leaves out `getAttachment` |
-| `GROOVE_API_URL` | Groove's own | Only for a different Groove API address |
+| `GROOVE_API_URL` | Groove's own | Only for a different Groove API address; it must be `https` |
 
 Settings take only `1` or `0`. Anything else, like `true`, stops the server, so a typo can't leave a safety setting off. Read-only always wins over the settings that write.
 

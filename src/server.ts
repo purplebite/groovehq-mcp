@@ -6,7 +6,7 @@ import {
   ListToolsRequestSchema,
   ReadResourceRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js';
-import { GrooveClient } from './groove-client.js';
+import { GrooveClient, checkApiUrl } from './groove-client.js';
 import * as conversations from './tools/conversations.js';
 import * as messages from './tools/messages.js';
 import * as contacts from './tools/contacts.js';
@@ -32,7 +32,7 @@ import {
   ToolContext,
 } from './tools/definition.js';
 
-export { GrooveClient };
+export { GrooveClient, checkApiUrl };
 
 export interface GrooveServerOptions {
   token: string;
