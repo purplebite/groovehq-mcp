@@ -7,6 +7,15 @@ updates:
     groups:
       development:
         dependency-type: development
+    # Majors our tools can't take yet: typescript-eslint allows TypeScript below 6.1, graphql-request allows
+    # graphql up to 16, and @types/node should match Node 22, the lowest version this package supports
+    ignore:
+      - dependency-name: typescript
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: graphql
+        update-types: ["version-update:semver-major"]
   - package-ecosystem: github-actions
     directory: /
     schedule:
