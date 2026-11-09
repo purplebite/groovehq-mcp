@@ -16,6 +16,9 @@ updates:
         update-types: ["version-update:semver-major"]
       - dependency-name: graphql
         update-types: ["version-update:semver-major"]
+      # unpdf 2 needs Node 24
+      - dependency-name: unpdf
+        update-types: ["version-update:semver-major"]
   - package-ecosystem: github-actions
     directory: /
     schedule:
